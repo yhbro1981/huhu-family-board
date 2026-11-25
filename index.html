@@ -961,6 +961,49 @@
             <button type="button" onclick="selectQuizPlayer('dad')" data-qplayer="dad" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">아빠</button>
             <button type="button" onclick="selectQuizPlayer('mom')" data-qplayer="mom" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">엄마</button>
           </div>
+          <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+            <button type="button" onclick="setQuizCategory('all')" data-qcat="all" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🎲 전체</button>
+            <button type="button" onclick="setQuizCategory('english')" data-qcat="english" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🔤 영단어</button>
+            <button type="button" onclick="setQuizCategory('history')" data-qcat="history" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🏛️ 한국사</button>
+          </div>
+        </div>
+
+        <!-- Quiz Question Card -->
+        <div class="bg-gradient-to-br from-indigo-50/60 to-purple-50/60 border border-indigo-200/80 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span id="quizCategoryBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">🔤 초5·6 영단어</span>
+            <span class="text-[10px] font-bold text-indigo-600">+10점 문제</span>
+          </div>
+          <h4 id="quizQuestionText" class="text-sm sm:text-base font-extrabold text-surface-ink leading-snug">
+            문제를 불러오는 중입니다...
+          </h4>
+          <div id="quizOptionsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Rendered by JS -->
+          </div>
+          <div id="quizFeedbackBox" class="hidden rounded-xl p-3 text-xs space-y-1">
+            <div id="quizFeedbackTitle" class="font-extrabold"></div>
+            <div id="quizFeedbackExplain" class="text-[11px] leading-relaxed"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="flex items-center justify-between pt-1">
+          <button type="button" onclick="resetWeeklyQuizScores()" class="text-[11px] font-bold text-slate-400 hover:text-rose-600 px-2 py-1 rounded">
+            주간 점수 초기화
+          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="nextRandomQuiz()" class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold shadow-sm transition active:scale-95">
+              🎲 다음 문제 출제
+            </button>
+            <button type="button" onclick="closeModal('quizModal')" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 11. Device Profile & Parent PIN Lock Modal (Initial PIN: 0531) -->
   <div id="profileLockModal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50" onclick="closeModal('profileLockModal')">
     <div class="bg-white border border-surface-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onclick="event.stopPropagation()">
@@ -1382,12 +1425,7 @@
       document.getElementById('newParentPinInput').value = '';
       showToast('✅ 부모 PIN 번호가 안전하게 변경되었습니다.');
     }
-    };
 
-    const STORAGE_KEY = 'family_board_yeongdeok_v5';
-    const CLOUD_URL_KEY = 'family_board_firebase_url_v1';
-    let state = loadState();
-    let firebaseDbUrl = loadFirebaseDbUrl();
     let lastCloudRevision = 0;
     let cloudPollTimer = null;
     let isCloudPushing = false;
@@ -2960,6 +2998,12 @@
         } else {
           previewContainer.innerHTML = compressedList.map((item, i) => `
             <div class="relative shrink-0 h-36 w-36 rounded-lg overflow-hidden border border-slate-300 bg-white">
+              <img src="${item.dataUrl}" alt="미리보기 ${i + 1}" class="w-full h-full object-cover" />
+              <span class="absolute top-1 left-1 bg-slate-900/75 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">${i + 1}</span>
+            </div>
+          `).join('');
+        }
+
         const uploaderPill = document.getElementById('photoUploaderDisplayPill');
         if (uploaderPill) {
           const effMeta = FAMILY_META[getEffectiveAuthor()] || FAMILY_META.family;
