@@ -9,6 +9,9 @@
   <!-- Pretendard & Inter Fonts -->
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+  <!-- Leaflet Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <script>
     tailwind.config = {
@@ -518,13 +521,23 @@
       <div id="rightBottomWidget" class="flex-1 min-h-[110px] grid grid-cols-2 gap-1.5 overflow-hidden">
         
         <!-- Left Bottom Card: 실시간 가족 위치 -->
-        <section class="h-full min-h-0 bg-white border border-surface-border rounded-xl shadow-card p-2.5 flex flex-col overflow-hidden">
-          <div class="flex items-center justify-between mb-1.5 shrink-0">
-            <h3 class="text-xs font-extrabold text-surface-ink">📍 실시간 가족 위치</h3>
-            <span class="text-[10px] font-semibold text-surface-muted">터치 시 상세</span>
+        <section class="relative h-full min-h-0 bg-gradient-to-br from-white via-slate-50/60 to-blue-50/40 border border-surface-border rounded-xl shadow-card p-2.5 flex flex-col overflow-hidden">
+          <!-- Subtle Radar Rings Background -->
+          <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-35" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="120" cy="88" r="34" stroke="#93C5FD" stroke-width="1" stroke-dasharray="3 3"/>
+            <circle cx="120" cy="88" r="68" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="4 4"/>
+            <circle cx="120" cy="88" r="102" stroke="#E2E8F0" stroke-width="1"/>
+          </svg>
+
+          <div class="relative z-10 flex items-center justify-between mb-1.5 shrink-0">
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-xs font-extrabold text-surface-ink">📍 실시간 가족 위치</h3>
+              <span id="homeCountPill" class="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full">집 1명</span>
+            </div>
+            <span class="text-[10px] font-bold text-blue-600">지도 보기 ›</span>
           </div>
 
-          <div id="familyLocationGrid" class="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1.5">
+          <div id="familyLocationGrid" class="relative z-10 flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1.5">
             <!-- 4 Interactive Member Cards rendered by JS -->
           </div>
         </section>
@@ -669,30 +682,23 @@
       </div>
 
       <div class="p-4 space-y-3">
-        <div class="relative h-36 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-          <svg class="absolute inset-0 w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="mapGrid" width="24" height="24" patternUnits="userSpaceOnUse">
-                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#CBD5E1" stroke-width="1"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#mapGrid)" />
-            <path d="M 0 95 Q 140 75 420 110" stroke="#94A3B8" stroke-width="5" fill="none" stroke-linecap="round"/>
-            <path d="M 180 0 L 210 150" stroke="#CBD5E1" stroke-width="4" fill="none"/>
-          </svg>
-          <div class="w-28 h-28 rounded-full border border-blue-300/60 bg-blue-400/10 flex items-center justify-center">
-            <div class="w-14 h-14 rounded-full border border-blue-400/70 bg-blue-400/15 flex items-center justify-center">
-              <div class="relative w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm shadow-lg radar-ping">
-                📍
-              </div>
+        <!-- Member Quick Switcher Pills -->
+        <div id="locModalMemberTabs" class="grid grid-cols-4 gap-1.5">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Real Interactive OpenStreetMap Container -->
+        <div class="relative h-44 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
+          <div id="realLeafletMap" class="w-full h-full z-0"></div>
+          <div class="absolute bottom-2 left-2.5 right-2.5 z-[400] bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between shadow-sm">
+            <div class="min-w-0 pr-2">
+              <div id="locModalPlaceName" class="text-xs font-extrabold text-surface-ink truncate">흥덕초등학교</div>
+              <div id="locModalAddress" class="text-[10px] text-surface-muted truncate">용인시 기흥구 영덕동</div>
             </div>
-          </div>
-          <div class="absolute bottom-2 left-2.5 right-2.5 bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between shadow-sm">
-            <div>
-              <div id="locModalPlaceName" class="text-xs font-extrabold text-surface-ink">영덕초등학교</div>
-              <div id="locModalAddress" class="text-[10px] text-surface-muted">용인시 기흥구 영덕동</div>
+            <div class="flex items-center gap-1 shrink-0">
+              <span id="locModalDistanceBadge" class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">🏠 집 근처</span>
+              <span id="locModalBattery" class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">🔋 84%</span>
             </div>
-            <span id="locModalBattery" class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">🔋 84%</span>
           </div>
         </div>
 
@@ -938,28 +944,28 @@
 
     const LOCATION_PRESETS = {
       jihu: [
-        { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '84%', icon: '🏫' },
-        { status: '수학 학원', place: '영덕동 정상수학학원', addr: '용인시 기흥구 흥덕중앙로', move: '✏️ 학원 수업 중 (체류 45분)', battery: '76%', icon: '📚' },
-        { status: '하교 이동 중', place: '흥덕중앙공원 사거리', addr: '용인시 기흥구 영덕동', move: '🚶 도보 이동 중 (집까지 6분)', battery: '72%', icon: '🚶' },
-        { status: '집에 있음', place: '우리 집 거실', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '95%', icon: '🏠' },
+        { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '84%', icon: '🏫', lat: 37.2762, lon: 127.0749 },
+        { status: '수학 학원', place: '영덕동 정상수학학원', addr: '용인시 기흥구 흥덕중앙로', move: '✏️ 학원 수업 중 (체류 45분)', battery: '76%', icon: '📚', lat: 37.2735, lon: 127.0761 },
+        { status: '하교 이동 중', place: '흥덕중앙공원 사거리', addr: '용인시 기흥구 영덕동', move: '🚶 도보 이동 중 (집까지 6분)', battery: '72%', icon: '🚶', lat: 37.2741, lon: 127.0742 },
+        { status: '집에 있음', place: '우리 집 거실', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '95%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
       ],
       seohu: [
-        { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '88%', icon: '🏫' },
-        { status: '태권도 학원', place: '백호 태권도장', addr: '용인시 기흥구 흥덕1로', move: '🥋 수련 중 (체류 35분)', battery: '81%', icon: '🥋' },
-        { status: '놀이터 / 외출', place: '단지 내 중앙놀이터', addr: '용인시 기흥구 영덕동', move: '⚽ 친구들과 놀이 중', battery: '74%', icon: '⚽' },
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '92%', icon: '🏠' },
+        { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '88%', icon: '🏫', lat: 37.2762, lon: 127.0749 },
+        { status: '태권도 학원', place: '백호 태권도장', addr: '용인시 기흥구 흥덕1로', move: '🥋 수련 중 (체류 35분)', battery: '81%', icon: '🥋', lat: 37.2728, lon: 127.0755 },
+        { status: '놀이터 / 외출', place: '단지 내 중앙놀이터', addr: '용인시 기흥구 영덕동', move: '⚽ 친구들과 놀이 중', battery: '74%', icon: '⚽', lat: 37.2751, lon: 127.0729 },
+        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '92%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
       ],
       dad: [
-        { status: '영통 근무/체류 중', place: '수원시 영통구 영통동', addr: '수원시 영통구 영통동 일대', move: '🏢 영통 지역 체류 중', battery: '85%', icon: '📍' },
-        { status: '퇴근 이동 중', place: '영통 → 영덕동 이동 경로', addr: '용인시 기흥구 영덕동 방향', move: '🚗 차량 이동 중 (집까지 약 10분)', battery: '75%', icon: '🚗' },
-        { status: '라이딩 중', place: '흥덕 중심상가 픽업존', addr: '용인시 기흥구 흥덕중앙로', move: '🚗 학원 픽업 대기', battery: '88%', icon: '🚗' },
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 휴식 중', battery: '96%', icon: '🏠' },
+        { status: '영통 근무/체류 중', place: '수원시 영통구 영통동', addr: '수원시 영통구 영통동 일대', move: '🏢 영통 지역 체류 중', battery: '85%', icon: '📍', lat: 37.2538, lon: 127.0742 },
+        { status: '퇴근 이동 중', place: '영통 → 영덕동 이동 경로', addr: '용인시 기흥구 영덕동 방향', move: '🚗 차량 이동 중 (집까지 약 10분)', battery: '75%', icon: '🚗', lat: 37.2645, lon: 127.0738 },
+        { status: '라이딩 중', place: '흥덕 중심상가 픽업존', addr: '용인시 기흥구 흥덕중앙로', move: '🚗 학원 픽업 대기', battery: '88%', icon: '🚗', lat: 37.2739, lon: 127.0758 },
+        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 휴식 중', battery: '96%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
       ],
       mom: [
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 집안일 & 오후 일정 준비', battery: '91%', icon: '🏠' },
-        { status: '장보기 / 마트', place: '이마트 흥덕점', addr: '용인시 기흥구 흥덕1로', move: '🛒 장보는 중 (체류 25분)', battery: '83%', icon: '🛒' },
-        { status: '외출 / 카페', place: '영덕동 동네 북카페', addr: '용인시 기흥구 영덕동', move: '☕ 외출 중', battery: '77%', icon: '☕' },
-        { status: '학원 라이딩', place: '흥덕초 후문 픽업', addr: '용인시 기흥구 영덕동', move: '🚗 차량 이동 중', battery: '85%', icon: '🚗' },
+        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 집안일 & 오후 일정 준비', battery: '91%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
+        { status: '장보기 / 마트', place: '이마트 흥덕점', addr: '용인시 기흥구 흥덕1로', move: '🛒 장보는 중 (체류 25분)', battery: '83%', icon: '🛒', lat: 37.2719, lon: 127.0765 },
+        { status: '외출 / 카페', place: '영덕동 동네 북카페', addr: '용인시 기흥구 영덕동', move: '☕ 외출 중', battery: '77%', icon: '☕', lat: 37.2755, lon: 127.0718 },
+        { status: '학원 라이딩', place: '흥덕초 후문 픽업', addr: '용인시 기흥구 영덕동', move: '🚗 차량 이동 중', battery: '85%', icon: '🚗', lat: 37.2760, lon: 127.0745 },
       ]
     };
 
@@ -1046,6 +1052,8 @@
     let lastTriggeredAlarmKey = '';
     let activeRingingAlarm = null;
     let currentLocationModalMember = 'dad';
+    let leafletMapInstance = null;
+    let leafletMarkersLayer = null;
     let gpsWatchId = null;
     const AUTO_GPS_MEMBER_KEY = 'family_board_auto_gps_member_v1';
 
@@ -1852,30 +1860,126 @@
     }
 
     // ==================== 6. LIVE FAMILY LOCATIONS ====================
+    function calcDistanceFromHomeLabel(lat, lon) {
+      if (typeof lat !== 'number' || typeof lon !== 'number') return '';
+      const R = 6371000;
+      const toRad = (deg) => deg * Math.PI / 180;
+      const dLat = toRad(lat - YEONGDEOK_COORDS.lat);
+      const dLon = toRad(lon - YEONGDEOK_COORDS.lon);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(YEONGDEOK_COORDS.lat)) * Math.cos(toRad(lat)) * Math.sin(dLon / 2) ** 2;
+      const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (distM < 150) return '🏠 우리 집';
+      if (distM < 1000) return `집에서 ${Math.round(distM / 10) * 10}m`;
+      return `집에서 ${(distM / 1000).toFixed(1)}km`;
+    }
+
     function renderFamilyLocations() {
       const grid = document.getElementById('familyLocationGrid');
       if (!grid) return;
       const members = ['jihu', 'seohu', 'dad', 'mom'];
+      let homeCount = 0;
 
       grid.innerHTML = members.map(key => {
         const meta = FAMILY_META[key];
         const loc = state.locations[key];
+        const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
+        const isAtHome = loc.status.includes('집') || distLabel === '🏠 우리 집';
+        if (isAtHome) homeCount++;
+
+        const cardBg = isAtHome
+          ? 'bg-emerald-50/75 hover:bg-emerald-100/70 border-emerald-200/90'
+          : 'bg-white/95 hover:bg-blue-50/70 border-slate-200/90 hover:border-blue-300';
+
         return `
-          <button onclick="openLocationModal('${key}')" class="text-left bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300 rounded-lg p-1.5 flex flex-col justify-between transition active:scale-95 overflow-hidden">
+          <button onclick="openLocationModal('${key}')" class="text-left ${cardBg} backdrop-blur-xs border rounded-lg p-1.5 flex flex-col justify-between transition active:scale-95 overflow-hidden shadow-2xs">
             <div class="flex items-center justify-between gap-1 w-full">
               <div class="flex items-center gap-1 min-w-0">
-                <span class="w-2 h-2 rounded-full ${meta.dot} shrink-0"></span>
+                <span class="relative flex h-2 w-2 shrink-0">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${meta.dot} opacity-60"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 ${meta.dot}"></span>
+                </span>
                 <span class="text-[11px] font-extrabold text-surface-ink truncate">${meta.name}</span>
+                ${distLabel ? `<span class="text-[8px] font-bold px-1 py-0.2 rounded ${isAtHome ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'} truncate">${distLabel}</span>` : ''}
               </div>
-              <span class="text-[11px] leading-none shrink-0">${loc.icon}</span>
+              <span class="text-xs leading-none shrink-0">${loc.icon}</span>
             </div>
-            <div class="mt-0.5 w-full">
-              <div class="text-[10px] font-extrabold text-blue-700 truncate leading-tight">${loc.status}</div>
-              <div class="text-[9px] font-medium text-surface-muted truncate leading-tight">${loc.place}</div>
+
+            <div class="my-0.5 w-full">
+              <div class="text-[10px] font-extrabold ${isAtHome ? 'text-emerald-800' : 'text-blue-700'} truncate leading-tight">${loc.status}</div>
+              <div class="text-[9px] font-semibold text-surface-muted truncate leading-tight">${loc.place}</div>
+            </div>
+
+            <div class="flex items-center justify-between w-full pt-0.5 border-t border-slate-200/50 text-[8px] font-bold text-slate-400">
+              <span class="truncate">${loc.updatedAt || '방금 전'}</span>
+              <span class="text-emerald-600 shrink-0">🔋${loc.battery || '85%'}</span>
             </div>
           </button>
         `;
       }).join('');
+
+      const homePill = document.getElementById('homeCountPill');
+      if (homePill) {
+        homePill.textContent = homeCount > 0 ? `🏠 귀가 ${homeCount}명` : '외출 중';
+      }
+    }
+
+    function renderLeafletFamilyMap(activeMemberKey) {
+      const mapEl = document.getElementById('realLeafletMap');
+      if (!mapEl || typeof L === 'undefined') return;
+
+      const activeLoc = state.locations[activeMemberKey] || {};
+      const centerLat = typeof activeLoc.lat === 'number' ? activeLoc.lat : YEONGDEOK_COORDS.lat;
+      const centerLon = typeof activeLoc.lon === 'number' ? activeLoc.lon : YEONGDEOK_COORDS.lon;
+
+      if (!leafletMapInstance) {
+        leafletMapInstance = L.map('realLeafletMap', { zoomControl: false, attributionControl: false }).setView([centerLat, centerLon], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18
+        }).addTo(leafletMapInstance);
+        leafletMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
+      } else {
+        leafletMapInstance.setView([centerLat, centerLon], 15);
+      }
+
+      leafletMarkersLayer.clearLayers();
+
+      // Home marker
+      const homeIcon = L.divIcon({
+        className: '',
+        html: `<div style="background:#0F172A;color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:9999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">🏠 우리집</div>`,
+        iconSize: [54, 22],
+        iconAnchor: [27, 11]
+      });
+      L.marker([YEONGDEOK_COORDS.lat, YEONGDEOK_COORDS.lon], { icon: homeIcon }).addTo(leafletMarkersLayer);
+
+      // Family member markers
+      const colorMap = { jihu: '#2563EB', seohu: '#059669', dad: '#334155', mom: '#E11D48' };
+      ['jihu', 'seohu', 'dad', 'mom'].forEach(key => {
+        const loc = state.locations[key];
+        const meta = FAMILY_META[key];
+        if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') return;
+        const isSelected = key === activeMemberKey;
+        const bg = colorMap[key] || '#2563EB';
+        const markerHtml = `
+          <div style="background:${bg};color:#fff;font-size:${isSelected ? '11px' : '10px'};font-weight:800;padding:${isSelected ? '3px 8px' : '2px 6px'};border-radius:9999px;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);white-space:nowrap;transform:${isSelected ? 'scale(1.12)' : 'scale(0.95)'};">
+            ${loc.icon} ${meta.name}
+          </div>
+        `;
+        const icon = L.divIcon({
+          className: '',
+          html: markerHtml,
+          iconSize: [64, 24],
+          iconAnchor: [32, 12]
+        });
+        L.marker([loc.lat, loc.lon], { icon, zIndexOffset: isSelected ? 500 : 100 })
+          .on('click', () => openLocationModal(key))
+          .addTo(leafletMarkersLayer);
+      });
+
+      setTimeout(() => {
+        if (leafletMapInstance) leafletMapInstance.invalidateSize();
+      }, 80);
     }
 
     function openLocationModal(memberKey) {
@@ -1884,6 +1988,20 @@
       if (!meta || !loc) return;
       currentLocationModalMember = memberKey;
 
+      // Render member switcher pills at top of modal
+      const tabsEl = document.getElementById('locModalMemberTabs');
+      if (tabsEl) {
+        tabsEl.innerHTML = ['jihu', 'seohu', 'dad', 'mom'].map(k => {
+          const m = FAMILY_META[k];
+          const active = k === memberKey;
+          return `
+            <button type="button" onclick="openLocationModal('${k}')" class="py-1 px-2 rounded-lg text-xs font-extrabold border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-surface-ink border-slate-200 hover:bg-slate-100'}">
+              ${m.name}
+            </button>
+          `;
+        }).join('');
+      }
+
       document.getElementById('locModalBadge').className = `w-3 h-3 rounded-full ${meta.dot}`;
       document.getElementById('locModalTitle').textContent = `${meta.name} (${meta.role}) 실시간 위치 상세`;
       document.getElementById('locModalPlaceName').textContent = loc.place;
@@ -1891,6 +2009,11 @@
       document.getElementById('locModalBattery').textContent = `🔋 ${loc.battery}`;
       document.getElementById('locModalMovement').textContent = loc.move;
       document.getElementById('locModalUpdated').textContent = `${loc.updatedAt} · GPS 연동`;
+
+      const distEl = document.getElementById('locModalDistanceBadge');
+      if (distEl) {
+        distEl.textContent = calcDistanceFromHomeLabel(loc.lat, loc.lon) || '용인·수원권';
+      }
 
       const savedAutoMember = localStorage.getItem(AUTO_GPS_MEMBER_KEY) || '';
       const autoCb = document.getElementById('autoTrackGpsCheckbox');
@@ -1912,6 +2035,8 @@
       const m = document.getElementById('locationModal');
       m.classList.remove('hidden');
       m.classList.add('flex');
+
+      renderLeafletFamilyMap(memberKey);
     }
 
     async function reverseGeocodeKorean(lat, lon) {
