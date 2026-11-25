@@ -448,12 +448,12 @@
             <div class="flex items-center justify-between mb-1.5 shrink-0">
               <div class="flex items-center gap-1">
                 <span class="w-1.5 h-3 rounded-full bg-blue-500"></span>
-                <h3 class="text-xs font-extrabold text-blue-700">지후 할 일 (초5)</h3>
+                <h3 class="text-xs font-extrabold text-blue-700">지후의 오늘 미션</h3>
               </div>
               <span id="jihuTodoCount" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-1.5 rounded-full">0</span>
             </div>
             <form onsubmit="quickAddTodo(event, 'jihu')" class="flex gap-1 mb-1.5 shrink-0">
-              <input id="inputTodoJihu" type="text" placeholder="지후 할 일 추가..." class="mobile-touch-input flex-1 min-w-0 text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:border-blue-400" />
+              <input id="inputTodoJihu" type="text" placeholder="지후 미션 추가..." class="mobile-touch-input flex-1 min-w-0 text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:border-blue-400" />
               <button type="submit" class="mobile-touch-btn px-2.5 py-0.5 rounded bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 shrink-0">+</button>
             </form>
             <div id="jihuTodoList" class="flex-1 min-h-0 space-y-1 overflow-y-auto custom-scroll pr-0.5">
@@ -466,12 +466,12 @@
             <div class="flex items-center justify-between mb-1.5 shrink-0">
               <div class="flex items-center gap-1">
                 <span class="w-1.5 h-3 rounded-full bg-emerald-500"></span>
-                <h3 class="text-xs font-extrabold text-emerald-700">서후 할 일 (초6)</h3>
+                <h3 class="text-xs font-extrabold text-emerald-700">서후의 오늘 미션</h3>
               </div>
               <span id="seohuTodoCount" class="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-1.5 rounded-full">0</span>
             </div>
             <form onsubmit="quickAddTodo(event, 'seohu')" class="flex gap-1 mb-1.5 shrink-0">
-              <input id="inputTodoSeohu" type="text" placeholder="서후 할 일 추가..." class="mobile-touch-input flex-1 min-w-0 text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:border-emerald-400" />
+              <input id="inputTodoSeohu" type="text" placeholder="서후 미션 추가..." class="mobile-touch-input flex-1 min-w-0 text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:border-emerald-400" />
               <button type="submit" class="mobile-touch-btn px-2.5 py-0.5 rounded bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 shrink-0">+</button>
             </form>
             <div id="seohuTodoList" class="flex-1 min-h-0 space-y-1 overflow-y-auto custom-scroll pr-0.5">
@@ -534,7 +534,7 @@
               <h3 class="text-xs font-extrabold text-surface-ink">📍 실시간 가족 위치</h3>
               <span id="homeCountPill" class="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full">집 1명</span>
             </div>
-            <span class="text-[10px] font-bold text-blue-600">지도 보기 ›</span>
+            <button type="button" onclick="openLocationModal('dad')" class="text-[10px] font-bold text-blue-600 hover:underline">지도 보기 ›</button>
           </div>
 
           <div id="familyLocationGrid" class="relative z-10 flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1.5">
@@ -621,8 +621,8 @@
           <div class="flex items-center justify-between gap-2">
             <select id="newAlarmWho" class="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white">
               <option value="family">가족 전체</option>
-              <option value="jihu">지후 (초5)</option>
-              <option value="seohu">서후 (초6)</option>
+              <option value="jihu">지후</option>
+              <option value="seohu">서후</option>
               <option value="dad">아빠</option>
               <option value="mom">엄마</option>
             </select>
@@ -928,44 +928,46 @@
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
   <script>
     const FAMILY_META = {
-      jihu:   { name: '지후', role: '초5', dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 border-blue-200',       bar: 'border-blue-500' },
-      seohu:  { name: '서후', role: '초6', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: 'border-emerald-500' },
-      dad:    { name: '아빠', role: '아빠', dot: 'bg-slate-600',   badge: 'bg-slate-100 text-slate-700 border-slate-300',   bar: 'border-slate-600' },
-      mom:    { name: '엄마', role: '엄마', dot: 'bg-rose-500',    badge: 'bg-rose-50 text-rose-700 border-rose-200',       bar: 'border-rose-500' },
-      family: { name: '가족', role: '공통', dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 border-purple-200', bar: 'border-purple-500' },
+      jihu:   { name: '지후', role: '초5', dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 border-blue-200',       bar: 'border-blue-500',    avatarBg: 'bg-blue-600' },
+      seohu:  { name: '서후', role: '초6', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: 'border-emerald-500', avatarBg: 'bg-emerald-600' },
+      dad:    { name: '아빠', role: '아빠', dot: 'bg-slate-600',   badge: 'bg-slate-100 text-slate-700 border-slate-300',   bar: 'border-slate-600',   avatarBg: 'bg-slate-700' },
+      mom:    { name: '엄마', role: '엄마', dot: 'bg-rose-500',    badge: 'bg-rose-50 text-rose-700 border-rose-200',       bar: 'border-rose-500',    avatarBg: 'bg-rose-600' },
+      family: { name: '가족', role: '공통', dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 border-purple-200', bar: 'border-purple-500',  avatarBg: 'bg-purple-600' },
     };
 
-    // Yongin-si Giheung-gu Yeongdeok-dong Coordinates
-    const YEONGDEOK_COORDS = {
-      name: '용인시 기흥구 영덕동',
-      lat: 37.2748,
-      lon: 127.0733
+    // Home Address: 경기도 용인시 기흥구 덕영대로2077번길 73-1
+    const HOME_LOCATION = {
+      name: '우리 집',
+      addr: '경기도 용인시 기흥구 덕영대로2077번길 73-1',
+      lat: 37.27215,
+      lon: 127.07152
     };
+    const YEONGDEOK_COORDS = HOME_LOCATION;
 
     const LOCATION_PRESETS = {
       jihu: [
         { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '84%', icon: '🏫', lat: 37.2762, lon: 127.0749 },
         { status: '수학 학원', place: '영덕동 정상수학학원', addr: '용인시 기흥구 흥덕중앙로', move: '✏️ 학원 수업 중 (체류 45분)', battery: '76%', icon: '📚', lat: 37.2735, lon: 127.0761 },
-        { status: '하교 이동 중', place: '흥덕중앙공원 사거리', addr: '용인시 기흥구 영덕동', move: '🚶 도보 이동 중 (집까지 6분)', battery: '72%', icon: '🚶', lat: 37.2741, lon: 127.0742 },
-        { status: '집에 있음', place: '우리 집 거실', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '95%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
+        { status: '이동중', place: '덕영대로 이동 경로', addr: '용인시 기흥구 영덕동', move: '🚶 이동중 (집까지 약 5분)', battery: '72%', icon: '🚶', lat: 37.2731, lon: 127.0728 },
+        { status: '집에 있음', place: '우리 집', addr: HOME_LOCATION.addr, move: '🏠 귀가 완료', battery: '95%', icon: '🏠', lat: HOME_LOCATION.lat, lon: HOME_LOCATION.lon },
       ],
       seohu: [
         { status: '학교 수업 중', place: '흥덕초등학교', addr: '용인시 기흥구 영덕동', move: '🏫 수업 중 (체류 3시간 10분)', battery: '88%', icon: '🏫', lat: 37.2762, lon: 127.0749 },
         { status: '태권도 학원', place: '백호 태권도장', addr: '용인시 기흥구 흥덕1로', move: '🥋 수련 중 (체류 35분)', battery: '81%', icon: '🥋', lat: 37.2728, lon: 127.0755 },
-        { status: '놀이터 / 외출', place: '단지 내 중앙놀이터', addr: '용인시 기흥구 영덕동', move: '⚽ 친구들과 놀이 중', battery: '74%', icon: '⚽', lat: 37.2751, lon: 127.0729 },
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 귀가 완료', battery: '92%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
+        { status: '이동중', place: '흥덕마을 이동 경로', addr: '용인시 기흥구 영덕동', move: '🚶 이동중', battery: '74%', icon: '🚶', lat: 37.2735, lon: 127.0725 },
+        { status: '집에 있음', place: '우리 집', addr: HOME_LOCATION.addr, move: '🏠 귀가 완료', battery: '92%', icon: '🏠', lat: HOME_LOCATION.lat, lon: HOME_LOCATION.lon },
       ],
       dad: [
-        { status: '영통 근무/체류 중', place: '수원시 영통구 영통동', addr: '수원시 영통구 영통동 일대', move: '🏢 영통 지역 체류 중', battery: '85%', icon: '📍', lat: 37.2538, lon: 127.0742 },
-        { status: '퇴근 이동 중', place: '영통 → 영덕동 이동 경로', addr: '용인시 기흥구 영덕동 방향', move: '🚗 차량 이동 중 (집까지 약 10분)', battery: '75%', icon: '🚗', lat: 37.2645, lon: 127.0738 },
-        { status: '라이딩 중', place: '흥덕 중심상가 픽업존', addr: '용인시 기흥구 흥덕중앙로', move: '🚗 학원 픽업 대기', battery: '88%', icon: '🚗', lat: 37.2739, lon: 127.0758 },
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 휴식 중', battery: '96%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
+        { status: '영통 체류 중', place: '수원시 영통구 영통동', addr: '수원시 영통구 영통동 일대', move: '🏢 영통 지역 체류 중', battery: '85%', icon: '📍', lat: 37.2538, lon: 127.0742 },
+        { status: '알바 중', place: '배달 · 운행 알바 중', addr: '수원 영통 · 용인 기흥 일대', move: '💼 30분 이상 연속 이동 · 알바 중', battery: '78%', icon: '💼', lat: 37.2615, lon: 127.0735 },
+        { status: '이동중', place: '덕영대로 이동 경로', addr: '용인시 기흥구 영덕동 방향', move: '🚗 차량 이동중', battery: '82%', icon: '🚗', lat: 37.2675, lon: 127.0724 },
+        { status: '집에 있음', place: '우리 집', addr: HOME_LOCATION.addr, move: '🏠 휴식 중', battery: '96%', icon: '🏠', lat: HOME_LOCATION.lat, lon: HOME_LOCATION.lon },
       ],
       mom: [
-        { status: '집에 있음', place: '우리 집', addr: '용인시 기흥구 영덕동', move: '🏠 집안일 & 오후 일정 준비', battery: '91%', icon: '🏠', lat: 37.2748, lon: 127.0733 },
+        { status: '집에 있음', place: '우리 집', addr: HOME_LOCATION.addr, move: '🏠 집안일 & 오후 일정 준비', battery: '91%', icon: '🏠', lat: HOME_LOCATION.lat, lon: HOME_LOCATION.lon },
         { status: '장보기 / 마트', place: '이마트 흥덕점', addr: '용인시 기흥구 흥덕1로', move: '🛒 장보는 중 (체류 25분)', battery: '83%', icon: '🛒', lat: 37.2719, lon: 127.0765 },
-        { status: '외출 / 카페', place: '영덕동 동네 북카페', addr: '용인시 기흥구 영덕동', move: '☕ 외출 중', battery: '77%', icon: '☕', lat: 37.2755, lon: 127.0718 },
-        { status: '학원 라이딩', place: '흥덕초 후문 픽업', addr: '용인시 기흥구 영덕동', move: '🚗 차량 이동 중', battery: '85%', icon: '🚗', lat: 37.2760, lon: 127.0745 },
+        { status: '이동중', place: '덕영대로2077번길 부근', addr: '용인시 기흥구 영덕동', move: '🚗 이동중', battery: '85%', icon: '🚗', lat: 37.2738, lon: 127.0722 },
+        { status: '외출 / 카페', place: '영덕동 동네 북카페', addr: '용인시 기흥구 영덕동', move: '☕ 외출 중', battery: '77%', icon: '☕', lat: 37.2745, lon: 127.0708 },
       ]
     };
 
@@ -1860,15 +1862,20 @@
     }
 
     // ==================== 6. LIVE FAMILY LOCATIONS ====================
-    function calcDistanceFromHomeLabel(lat, lon) {
-      if (typeof lat !== 'number' || typeof lon !== 'number') return '';
+    function calcDistanceMeters(lat1, lon1, lat2, lon2) {
+      if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || typeof lat2 !== 'number' || typeof lon2 !== 'number') return null;
       const R = 6371000;
       const toRad = (deg) => deg * Math.PI / 180;
-      const dLat = toRad(lat - YEONGDEOK_COORDS.lat);
-      const dLon = toRad(lon - YEONGDEOK_COORDS.lon);
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
       const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(YEONGDEOK_COORDS.lat)) * Math.cos(toRad(lat)) * Math.sin(dLon / 2) ** 2;
-      const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function calcDistanceFromHomeLabel(lat, lon) {
+      const distM = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
+      if (distM === null) return '';
       if (distM < 150) return '🏠 우리 집';
       if (distM < 1000) return `집에서 ${Math.round(distM / 10) * 10}m`;
       return `집에서 ${(distM / 1000).toFixed(1)}km`;
@@ -1885,34 +1892,55 @@
         const loc = state.locations[key];
         const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
         const isAtHome = loc.status.includes('집') || distLabel === '🏠 우리 집';
+        const isAlba = loc.status.includes('알바');
+        const isMoving = loc.status.includes('이동');
         if (isAtHome) homeCount++;
 
         const cardBg = isAtHome
-          ? 'bg-emerald-50/75 hover:bg-emerald-100/70 border-emerald-200/90'
-          : 'bg-white/95 hover:bg-blue-50/70 border-slate-200/90 hover:border-blue-300';
+          ? 'bg-emerald-50/85 hover:bg-emerald-100/75 border-emerald-200'
+          : isAlba
+          ? 'bg-amber-50/90 hover:bg-amber-100/80 border-amber-300'
+          : 'bg-white hover:bg-blue-50/70 border-slate-200 hover:border-blue-300';
+
+        const statusBadgeStyle = isAtHome
+          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+          : isAlba
+          ? 'bg-amber-100 text-amber-900 border-amber-300'
+          : isMoving
+          ? 'bg-sky-100 text-sky-800 border-sky-200'
+          : 'bg-blue-50 text-blue-700 border-blue-200';
+
+        const batNum = parseInt(String(loc.battery || '85').replace(/[^0-9]/g, ''), 10) || 85;
+        const batBarColor = batNum <= 20 ? 'bg-rose-500' : batNum <= 45 ? 'bg-amber-400' : 'bg-emerald-500';
 
         return `
-          <button onclick="openLocationModal('${key}')" class="text-left ${cardBg} backdrop-blur-xs border rounded-lg p-1.5 flex flex-col justify-between transition active:scale-95 overflow-hidden shadow-2xs">
+          <button onclick="openLocationModal('${key}')" class="text-left ${cardBg} border rounded-xl px-2.5 py-2 flex flex-col justify-between transition active:scale-95 overflow-hidden shadow-2xs">
             <div class="flex items-center justify-between gap-1 w-full">
-              <div class="flex items-center gap-1 min-w-0">
-                <span class="relative flex h-2 w-2 shrink-0">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${meta.dot} opacity-60"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 ${meta.dot}"></span>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="w-5 h-5 rounded-full ${meta.avatarBg} text-white text-[10px] font-black flex items-center justify-center shrink-0 shadow-2xs">
+                  ${meta.name.slice(0, 1)}
                 </span>
-                <span class="text-[11px] font-extrabold text-surface-ink truncate">${meta.name}</span>
-                ${distLabel ? `<span class="text-[8px] font-bold px-1 py-0.2 rounded ${isAtHome ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'} truncate">${distLabel}</span>` : ''}
+                <span class="text-xs font-extrabold text-surface-ink truncate">${meta.name}</span>
               </div>
-              <span class="text-xs leading-none shrink-0">${loc.icon}</span>
+              ${distLabel ? `<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${isAtHome ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'} shrink-0">${distLabel}</span>` : ''}
             </div>
 
-            <div class="my-0.5 w-full">
-              <div class="text-[10px] font-extrabold ${isAtHome ? 'text-emerald-800' : 'text-blue-700'} truncate leading-tight">${loc.status}</div>
-              <div class="text-[9px] font-semibold text-surface-muted truncate leading-tight">${loc.place}</div>
+            <div class="my-1 w-full space-y-0.5">
+              <div class="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border ${statusBadgeStyle} max-w-full">
+                <span>${loc.icon}</span>
+                <span class="truncate">${loc.status}</span>
+              </div>
+              <div class="text-[11px] font-bold text-surface-ink truncate pl-0.5">${loc.place}</div>
             </div>
 
-            <div class="flex items-center justify-between w-full pt-0.5 border-t border-slate-200/50 text-[8px] font-bold text-slate-400">
+            <div class="flex items-center justify-between gap-2 w-full pt-1 border-t border-slate-200/60 text-[9px] font-bold text-slate-500">
               <span class="truncate">${loc.updatedAt || '방금 전'}</span>
-              <span class="text-emerald-600 shrink-0">🔋${loc.battery || '85%'}</span>
+              <div class="flex items-center gap-1 shrink-0">
+                <div class="w-6 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full ${batBarColor} rounded-full" style="width: ${Math.min(100, Math.max(8, batNum))}%"></div>
+                </div>
+                <span class="text-slate-600 tabular-nums">${loc.battery || '85%'}</span>
+              </div>
             </div>
           </button>
         `;
@@ -1929,8 +1957,8 @@
       if (!mapEl || typeof L === 'undefined') return;
 
       const activeLoc = state.locations[activeMemberKey] || {};
-      const centerLat = typeof activeLoc.lat === 'number' ? activeLoc.lat : YEONGDEOK_COORDS.lat;
-      const centerLon = typeof activeLoc.lon === 'number' ? activeLoc.lon : YEONGDEOK_COORDS.lon;
+      const centerLat = typeof activeLoc.lat === 'number' ? activeLoc.lat : HOME_LOCATION.lat;
+      const centerLon = typeof activeLoc.lon === 'number' ? activeLoc.lon : HOME_LOCATION.lon;
 
       if (!leafletMapInstance) {
         leafletMapInstance = L.map('realLeafletMap', { zoomControl: false, attributionControl: false }).setView([centerLat, centerLon], 15);
@@ -1944,36 +1972,33 @@
 
       leafletMarkersLayer.clearLayers();
 
-      // Home marker
+      // Home marker (경기도 용인시 기흥구 덕영대로2077번길 73-1)
       const homeIcon = L.divIcon({
         className: '',
-        html: `<div style="background:#0F172A;color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:9999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">🏠 우리집</div>`,
-        iconSize: [54, 22],
-        iconAnchor: [27, 11]
+        html: `<div style="background:#0F172A;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:9999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.28);white-space:nowrap;">🏠 우리집</div>`,
+        iconSize: [58, 22],
+        iconAnchor: [29, 11]
       });
-      L.marker([YEONGDEOK_COORDS.lat, YEONGDEOK_COORDS.lon], { icon: homeIcon }).addTo(leafletMarkersLayer);
+      L.marker([HOME_LOCATION.lat, HOME_LOCATION.lon], { icon: homeIcon })
+        .bindPopup(`<b>우리 집</b><br>${HOME_LOCATION.addr}`)
+        .addTo(leafletMarkersLayer);
 
       // Family member markers
-      const colorMap = { jihu: '#2563EB', seohu: '#059669', dad: '#334155', mom: '#E11D48' };
-      ['jihu', 'seohu', 'dad', 'mom'].forEach(key => {
-        const loc = state.locations[key];
-        const meta = FAMILY_META[key];
+      const colorHexMap = { jihu: '#2563EB', seohu: '#059669', dad: '#334155', mom: '#E11D48' };
+      ['jihu', 'seohu', 'dad', 'mom'].forEach(k => {
+        const loc = state.locations[k];
+        const meta = FAMILY_META[k];
         if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') return;
-        const isSelected = key === activeMemberKey;
-        const bg = colorMap[key] || '#2563EB';
-        const markerHtml = `
-          <div style="background:${bg};color:#fff;font-size:${isSelected ? '11px' : '10px'};font-weight:800;padding:${isSelected ? '3px 8px' : '2px 6px'};border-radius:9999px;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);white-space:nowrap;transform:${isSelected ? 'scale(1.12)' : 'scale(0.95)'};">
-            ${loc.icon} ${meta.name}
-          </div>
-        `;
-        const icon = L.divIcon({
+        const isSelected = k === activeMemberKey;
+        const bg = colorHexMap[k] || '#2563EB';
+        const markerIcon = L.divIcon({
           className: '',
-          html: markerHtml,
-          iconSize: [64, 24],
-          iconAnchor: [32, 12]
+          html: `<div style="background:${bg};color:#fff;font-size:${isSelected ? '11px' : '10px'};font-weight:800;padding:${isSelected ? '3px 9px' : '2px 7px'};border-radius:9999px;border:${isSelected ? '2.5px solid #FACC15' : '2px solid #fff'};box-shadow:0 3px 8px rgba(0,0,0,0.32);white-space:nowrap;">${loc.icon} ${meta.name}</div>`,
+          iconSize: [68, 24],
+          iconAnchor: [34, 12]
         });
-        L.marker([loc.lat, loc.lon], { icon, zIndexOffset: isSelected ? 500 : 100 })
-          .on('click', () => openLocationModal(key))
+        L.marker([loc.lat, loc.lon], { icon: markerIcon })
+          .bindPopup(`<b>${meta.name} (${loc.status})</b><br>${loc.place}`)
           .addTo(leafletMarkersLayer);
       });
 
@@ -2004,60 +2029,60 @@
 
       document.getElementById('locModalBadge').className = `w-3 h-3 rounded-full ${meta.dot}`;
       document.getElementById('locModalTitle').textContent = `${meta.name} (${meta.role}) 실시간 위치 상세`;
-      document.getElementById('locModalPlaceName').textContent = loc.place;
+      document.getElementById('locModalPlaceName').textContent = `${loc.icon} ${loc.place}`;
       document.getElementById('locModalAddress').textContent = loc.addr;
       document.getElementById('locModalBattery').textContent = `🔋 ${loc.battery}`;
       document.getElementById('locModalMovement').textContent = loc.move;
-      document.getElementById('locModalUpdated').textContent = `${loc.updatedAt} · GPS 연동`;
+      document.getElementById('locModalUpdated').textContent = `${loc.updatedAt || '방금 전'} · GPS 정확`;
 
-      const distEl = document.getElementById('locModalDistanceBadge');
-      if (distEl) {
-        distEl.textContent = calcDistanceFromHomeLabel(loc.lat, loc.lon) || '용인·수원권';
+      const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
+      const distBadge = document.getElementById('locModalDistanceBadge');
+      if (distBadge) {
+        distBadge.textContent = distLabel || '위치 확인됨';
       }
 
-      const savedAutoMember = localStorage.getItem(AUTO_GPS_MEMBER_KEY) || '';
-      const autoCb = document.getElementById('autoTrackGpsCheckbox');
-      if (autoCb) autoCb.checked = (savedAutoMember === memberKey);
+      const coordHint = document.getElementById('gpsCoordHint');
+      if (coordHint) {
+        coordHint.textContent = (typeof loc.lat === 'number' && typeof loc.lon === 'number')
+          ? `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`
+          : 'GPS 대기';
+      }
 
-      const hintEl = document.getElementById('gpsCoordHint');
-      if (hintEl) {
-        hintEl.textContent = (loc.lat && loc.lon) ? `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}` : 'GPS 대기';
+      const autoChk = document.getElementById('autoTrackGpsCheckbox');
+      if (autoChk) {
+        autoChk.checked = localStorage.getItem(AUTO_GPS_MEMBER_KEY) === memberKey;
       }
 
       const presets = LOCATION_PRESETS[memberKey] || [];
       document.getElementById('locModalPresets').innerHTML = presets.map((p, idx) => `
-        <button onclick="applyLocationPreset('${memberKey}', ${idx})" class="text-left p-2 rounded-xl border ${loc.status === p.status ? 'bg-blue-50 border-blue-400 text-blue-800' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-surface-ink'} transition">
-          <div class="text-xs font-extrabold">${p.icon} ${p.status}</div>
+        <button onclick="applyLocationPreset('${memberKey}', ${idx})" class="text-left p-2 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition">
+          <div class="text-xs font-extrabold text-surface-ink">${p.icon} ${p.status}</div>
           <div class="text-[10px] text-surface-muted truncate">${p.place}</div>
         </button>
       `).join('');
 
-      const m = document.getElementById('locationModal');
-      m.classList.remove('hidden');
-      m.classList.add('flex');
-
+      const modal = document.getElementById('locationModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
       renderLeafletFamilyMap(memberKey);
     }
 
     async function reverseGeocodeKorean(lat, lon) {
       try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=ko`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('geocode failed');
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=ko`);
+        if (!res.ok) throw new Error('Reverse geocode failed');
         const data = await res.json();
-        const addr = data.address || {};
-        const city = addr.city || addr.county || addr.province || '';
-        const district = addr.borough || addr.city_district || addr.suburb || '';
-        const dong = addr.quarter || addr.neighbourhood || addr.town || addr.village || addr.road || '';
-        const poi = data.name && data.name !== dong ? data.name : '';
-
-        const shortPlace = [district, dong].filter(Boolean).join(' ') || poi || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        const fullAddr = [city, district, dong, poi].filter(Boolean).join(' ') || `위도 ${lat.toFixed(4)}, 경도 ${lon.toFixed(4)}`;
+        const a = data.address || {};
+        const city = a.city || a.county || a.province || '';
+        const district = a.borough || a.suburb || a.city_district || '';
+        const dong = a.quarter || a.neighbourhood || a.village || a.town || a.road || '';
+        const shortPlace = [district, dong].filter(Boolean).join(' ') || city || '현재 GPS 위치';
+        const fullAddr = [city, district, dong].filter(Boolean).join(' ') || data.display_name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
         return { shortPlace, fullAddr };
       } catch (e) {
         return {
-          shortPlace: `현위치 (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
-          fullAddr: `GPS 좌표: ${lat.toFixed(5)}, ${lon.toFixed(5)}`
+          shortPlace: `위도 ${lat.toFixed(4)}, 경도 ${lon.toFixed(4)}`,
+          fullAddr: `GPS 좌표 (${lat.toFixed(5)}, ${lon.toFixed(5)})`
         };
       }
     }
@@ -2069,24 +2094,63 @@
           return `${Math.round(bat.level * 100)}%`;
         }
       } catch (e) {}
-      return '실시간';
+      return '85%';
     }
 
-    async function updateMemberLocationFromCoords(memberKey, lat, lon, silent = false) {
+    async function updateMemberLocationFromCoords(memberKey, lat, lon, silent = false, isContinuousTracking = false) {
+      const prevLoc = state.locations[memberKey] || {};
       const geo = await reverseGeocodeKorean(lat, lon);
       const batteryLabel = await getDeviceBatteryLabel();
       const now = new Date();
+      const nowMs = now.getTime();
       const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} 갱신`;
 
+      const distFromHome = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
+      const movedMeters = calcDistanceMeters(prevLoc.lat, prevLoc.lon, lat, lon);
+
+      let statusText = '실시간 GPS 위치';
+      let statusIcon = '📡';
+      let moveDetail = `📡 실제 스마트폰 GPS (${timeLabel})`;
+      let placeName = geo.shortPlace;
+      let fullAddress = geo.fullAddr;
+      let movingStartedAt = prevLoc.movingStartedAt || null;
+
+      if (distFromHome !== null && distFromHome < 150) {
+        statusText = '집에 있음';
+        statusIcon = '🏠';
+        placeName = '우리 집';
+        fullAddress = HOME_LOCATION.addr;
+        moveDetail = `🏠 귀가 완료 (${timeLabel})`;
+        movingStartedAt = null;
+      } else if (isContinuousTracking && movedMeters !== null && movedMeters >= 40) {
+        if (!movingStartedAt) movingStartedAt = nowMs;
+        const movingMinutes = Math.floor((nowMs - movingStartedAt) / 60000);
+
+        if (memberKey === 'dad' && movingMinutes >= 30) {
+          statusText = '알바 중';
+          statusIcon = '💼';
+          moveDetail = `💼 연속 이동 ${movingMinutes}분 경과 · 알바 중 (${timeLabel})`;
+        } else {
+          statusText = '이동중';
+          statusIcon = memberKey === 'dad' ? '🚗' : '🚶';
+          moveDetail = `${statusIcon} 실시간 이동중 (${movingMinutes > 0 ? movingMinutes + '분째 · ' : ''}${timeLabel})`;
+        }
+      } else {
+        if (movedMeters !== null && movedMeters < 25) {
+          movingStartedAt = null;
+        }
+      }
+
       state.locations[memberKey] = {
-        status: '실시간 GPS 위치',
-        place: geo.shortPlace,
-        addr: geo.fullAddr,
-        move: `📡 실제 스마트폰 GPS (${timeLabel})`,
+        status: statusText,
+        place: placeName,
+        addr: fullAddress,
+        move: moveDetail,
         battery: batteryLabel,
-        icon: '📡',
+        icon: statusIcon,
         lat,
         lon,
+        movingStartedAt,
         updatedAt: timeLabel
       };
 
@@ -2097,7 +2161,7 @@
         openLocationModal(memberKey);
       }
       if (!silent) {
-        showToast(`📡 ${FAMILY_META[memberKey].name} 위치가 '${geo.shortPlace}'(으)로 업데이트되었습니다!`);
+        showToast(`📡 ${FAMILY_META[memberKey].name} 위치가 '${placeName}'(${statusText})로 업데이트되었습니다!`);
       }
     }
 
@@ -2112,7 +2176,7 @@
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          await updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, false);
+          await updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, false, false);
           if (btn) btn.innerHTML = '<span>📡</span><span>내 스마트폰 실제 GPS 위치로 즉시 갱신</span>';
         },
         (err) => {
@@ -2148,12 +2212,12 @@
       gpsWatchId = navigator.geolocation.watchPosition(
         (pos) => {
           const now = Date.now();
-          if (now - lastSentAt < 60 * 1000) return; // Throttle to once per minute
+          if (now - lastSentAt < 45 * 1000) return; // Throttle to once every 45s
           lastSentAt = now;
-          updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, true);
+          updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, true, true);
         },
         () => {},
-        { enableHighAccuracy: true, maximumAge: 30000 }
+        { enableHighAccuracy: true, maximumAge: 20000 }
       );
     }
 
@@ -2389,7 +2453,7 @@
             </div>
 
             <div class="border border-slate-200 rounded-xl p-3.5">
-              <h3 class="text-xs font-extrabold text-surface-ink mb-2">☑️ ${todoKey === 'parents' ? '아빠 · 엄마 할 일' : meta.name + ' 할 일'}</h3>
+              <h3 class="text-xs font-extrabold text-surface-ink mb-2">☑️ ${todoKey === 'parents' ? '아빠 · 엄마 체크리스트' : meta.name + '의 오늘 미션'}</h3>
               <div class="space-y-1.5">
                 ${myTodos.map((t, idx) => `
                   <button onclick="toggleTodo('${todoKey}', ${idx})" class="w-full text-left flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100">
@@ -2424,7 +2488,7 @@
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             ${['jihu', 'seohu', 'parents'].map(grp => {
-              const title = grp === 'jihu' ? '지후 할 일 (초5)' : grp === 'seohu' ? '서후 할 일 (초6)' : '아빠 · 엄마 할 일';
+              const title = grp === 'jihu' ? '지후의 오늘 미션' : grp === 'seohu' ? '서후의 오늘 미션' : '아빠 · 엄마 체크리스트';
               return `
                 <div class="border border-slate-200 rounded-xl p-3.5">
                   <h3 class="text-xs font-extrabold mb-2.5">${title}</h3>
