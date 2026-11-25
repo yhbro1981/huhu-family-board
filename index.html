@@ -271,7 +271,7 @@
         <span>📅</span><span>일정</span>
       </button>
       <button onclick="switchTab('album')" data-tab="album" class="nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-surface-border text-surface-ink hover:bg-slate-50 shadow-pill text-[11px] font-bold transition active:scale-95">
-        <span>🖼️</span><span>공유 사진첩</span>
+        <span>🖼️</span><span>우리 사진</span>
         <span id="albumCountBadge" class="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 rounded-full font-extrabold">2</span>
       </button>
     </div>
@@ -313,12 +313,16 @@
       </button>
 
       <!-- Center-Left Quick Actions -->
-      <div class="flex flex-col gap-1.5 shrink-0 border-l border-slate-100 pl-2.5">
-        <button onclick="openNoteModal()" class="mobile-touch-btn flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-[11px] font-bold transition active:scale-95">
+      <div class="flex flex-col gap-1 shrink-0 border-l border-slate-100 pl-2">
+        <button onclick="openNoteModal()" class="mobile-touch-btn flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-[10px] font-bold transition active:scale-95">
           <span>✏️</span><span>쪽지 보내기</span>
         </button>
-        <button onclick="triggerPhotoUpload()" class="mobile-touch-btn flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 text-[11px] font-bold transition active:scale-95">
+        <button onclick="triggerPhotoUpload()" class="mobile-touch-btn flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 text-[10px] font-bold transition active:scale-95">
           <span>📷</span><span>사진 올리기</span>
+        </button>
+        <button onclick="openQuizModal()" class="mobile-touch-btn flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 text-[10px] font-extrabold transition active:scale-95">
+          <span>🧠</span><span>오늘의 퀴즈</span>
+          <span id="quizHeroLeaderBadge" class="hidden sm:inline-block text-[9px] bg-purple-600 text-white px-1 rounded-full"></span>
         </button>
       </div>
     </div>
@@ -550,22 +554,28 @@
             <button type="button" onclick="openLocationModal('dad')" class="text-[10px] font-bold text-blue-600 hover:underline">지도 보기 ›</button>
           </div>
 
-          <div id="familyLocationGrid" class="relative z-10 flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1.5">
-            <!-- 4 Interactive Member Cards rendered by JS -->
+          <div id="familyLocationGrid" class="relative z-10 flex-1 min-h-0 grid grid-cols-2 gap-1.5">
+            <!-- Rendered by JS -->
           </div>
         </section>
 
-        <!-- Right Bottom Card: 가족 공유 사진첩 -->
+        <!-- Right Bottom Card: 우리 사진 -->
         <section class="h-full min-h-0 bg-white border border-surface-border rounded-xl shadow-card p-2.5 flex flex-col overflow-hidden">
           <div class="flex items-center justify-between mb-1.5 shrink-0">
-            <h3 class="text-xs font-extrabold text-surface-ink">🖼️ 가족 공유 사진첩</h3>
-            <button onclick="triggerPhotoUpload()" class="mobile-touch-btn text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded transition active:scale-95">
-              + 올리기
-            </button>
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-xs font-extrabold text-surface-ink">🖼️ 우리 사진</h3>
+              <span id="widgetPhotoCountHint" class="text-[9px] font-bold text-slate-400">가로 스크롤</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="switchTab('album')" class="text-[10px] font-bold text-slate-500 hover:text-blue-600 px-1.5 py-0.5 rounded transition">전체 ›</button>
+              <button onclick="triggerPhotoUpload()" class="mobile-touch-btn text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded transition active:scale-95">
+                + 올리기
+              </button>
+            </div>
           </div>
 
-          <div id="sharedPhotoPreviewGrid" class="flex-1 min-h-0 grid grid-cols-2 gap-1.5 overflow-hidden">
-            <!-- Compact Thumbnail Grid rendered by JS -->
+          <div id="sharedPhotoPreviewGrid" class="flex-1 min-h-0 flex gap-1.5 overflow-x-auto custom-scroll snap-x snap-mandatory pb-0.5">
+            <!-- Scrollable Thumbnail Strip rendered by JS -->
           </div>
         </section>
 
@@ -843,7 +853,7 @@
     <div class="bg-white border border-surface-border rounded-2xl shadow-xl w-full max-w-md p-4" onclick="event.stopPropagation()">
       <div class="flex items-center justify-between mb-2">
         <div>
-          <h3 class="text-sm font-extrabold text-surface-ink">📷 공유 사진첩에 올리기</h3>
+          <h3 class="text-sm font-extrabold text-surface-ink">📷 우리 사진에 올리기</h3>
           <p id="photoCompressionBadge" class="text-[10px] font-bold text-emerald-700 mt-0.5">✨ 자동 용량 최적화 완료</p>
         </div>
         <button onclick="closeModal('photoUploadModal')" class="text-surface-muted hover:text-surface-ink px-2 py-1">✕</button>
@@ -881,12 +891,13 @@
       <div class="bg-slate-950 flex items-center justify-center max-h-[62vh]">
         <img id="lightboxImg" src="" alt="공유 사진" class="max-h-[62vh] object-contain" />
       </div>
-      <div class="p-3.5 flex items-center justify-between">
-        <div>
-          <div id="lightboxCaption" class="text-sm font-extrabold text-surface-ink">사진 제목</div>
+      <div class="p-3.5 flex items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div id="lightboxCaption" class="text-sm font-extrabold text-surface-ink truncate">사진 제목</div>
           <div id="lightboxMeta" class="text-xs text-surface-muted mt-0.5">올린 사람 · 날짜</div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="downloadCurrentLightboxPhoto()" class="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg">⬇️ 다운로드</button>
           <button onclick="deleteCurrentLightboxPhoto()" class="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg">삭제</button>
           <button onclick="closeModal('lightboxModal')" class="text-xs font-bold bg-slate-900 text-white px-3.5 py-1.5 rounded-lg">닫기</button>
         </div>
@@ -930,6 +941,86 @@
           <button type="submit" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-sm">연결 및 동기화 시작</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 10. Today's Quiz (Grade 5-6 English & Korean History) & Family Weekly Scoreboard Modal -->
+  <div id="quizModal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50" onclick="closeModal('quizModal')">
+    <div class="bg-white border border-surface-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="px-4 py-3 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border-b border-purple-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🧠</span>
+          <div>
+            <h3 class="text-sm font-extrabold text-surface-ink">오늘의 가족 퀴즈 · 초등 5·6학년 영단어 & 한국사</h3>
+            <p class="text-[10px] text-surface-muted">정답을 맞히면 +10점! 이번 주 우리 집 퀴즈왕에 도전하세요</p>
+          </div>
+        </div>
+        <button onclick="closeModal('quizModal')" class="text-surface-muted hover:text-surface-ink text-sm font-bold px-2 py-1 rounded-lg hover:bg-white/70">✕</button>
+      </div>
+
+      <div class="p-4 space-y-3 max-h-[82vh] overflow-y-auto custom-scroll">
+        <!-- Family Weekly Scoreboard -->
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-extrabold text-surface-ink">🏆 이번 주 가족 퀴즈 스코어보드</span>
+            <span id="quizWeekLabel" class="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">이번 주 누적 점수</span>
+          </div>
+          <div id="quizScoreboardGrid" class="grid grid-cols-4 gap-1.5">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Challenger & Category Selector -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-1">
+            <span class="text-[11px] font-extrabold text-surface-muted mr-1">도전자:</span>
+            <button type="button" onclick="selectQuizPlayer('jihu')" data-qplayer="jihu" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">지후</button>
+            <button type="button" onclick="selectQuizPlayer('seohu')" data-qplayer="seohu" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">서후</button>
+            <button type="button" onclick="selectQuizPlayer('dad')" data-qplayer="dad" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">아빠</button>
+            <button type="button" onclick="selectQuizPlayer('mom')" data-qplayer="mom" class="qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border transition">엄마</button>
+          </div>
+
+          <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+            <button type="button" onclick="setQuizCategory('all')" data-qcat="all" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🎲 전체</button>
+            <button type="button" onclick="setQuizCategory('english')" data-qcat="english" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🔤 영단어</button>
+            <button type="button" onclick="setQuizCategory('history')" data-qcat="history" class="qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold transition">🏛️ 한국사</button>
+          </div>
+        </div>
+
+        <!-- Question Card -->
+        <div class="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/60 border border-indigo-200/80 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span id="quizCategoryBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">🔤 초등 5·6학년 영단어</span>
+            <span id="quizDifficultyBadge" class="text-[10px] font-bold text-slate-500">배점 +10점</span>
+          </div>
+          <h4 id="quizQuestionText" class="text-base font-black text-surface-ink leading-snug">
+            문제를 불러오는 중...
+          </h4>
+
+          <!-- 4 Multiple Choice Options -->
+          <div id="quizOptionsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Feedback & Explanation Box -->
+          <div id="quizFeedbackBox" class="hidden rounded-xl p-3 text-xs space-y-1">
+            <div id="quizFeedbackTitle" class="font-black text-sm">정답입니다! +10점</div>
+            <p id="quizFeedbackExplain" class="font-medium leading-relaxed"></p>
+          </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="flex items-center justify-between pt-1">
+          <button type="button" onclick="resetWeeklyQuizScores()" class="text-[11px] font-bold text-slate-400 hover:text-rose-600 px-2 py-1">주간 점수 초기화</button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="nextRandomQuiz()" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold shadow-sm transition active:scale-95">
+              🔄 다음 문제 출제
+            </button>
+            <button type="button" onclick="closeModal('quizModal')" class="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">닫기</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1067,7 +1158,12 @@
       photos: [
         { id: 'ph1', uploader: 'mom', caption: '주말 광교 호수공원 나들이', date: '11월 22일', src: makeSamplePhotoSvg('#DBEAFE', '#E0E7FF', '🏞️', '광교 호수공원 산책') },
         { id: 'ph2', uploader: 'jihu', caption: '서후랑 만든 레고 우주선', date: '11월 20일', src: makeSamplePhotoSvg('#FEF3C7', '#FDE68A', '🚀', '형제 합작 레고 우주선') },
-      ]
+      ],
+      quizScoreboard: {
+        weekKey: '',
+        scores: { jihu: 0, seohu: 0, dad: 0, mom: 0 },
+        solvedCount: { jihu: 0, seohu: 0, dad: 0, mom: 0 }
+      }
     };
 
     const STORAGE_KEY = 'family_board_yeongdeok_v5';
@@ -1284,7 +1380,8 @@
           ...DEFAULT_STATE,
           ...parsed,
           alarms: parsed.alarms || DEFAULT_STATE.alarms,
-          splitRatios: parsed.splitRatios || DEFAULT_STATE.splitRatios
+          splitRatios: parsed.splitRatios || DEFAULT_STATE.splitRatios,
+          quizScoreboard: parsed.quizScoreboard || DEFAULT_STATE.quizScoreboard
         };
       } catch (e) {
         return JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -2423,18 +2520,21 @@
     // ==================== 7. SHARED PHOTO ALBUM (AUTO-COMPRESSION + MULTI-PHOTO) ====================
     function renderSharedAlbumWidget() {
       document.getElementById('albumCountBadge').textContent = state.photos.length;
-      const recent = state.photos.slice(0, 2);
+      const hintEl = document.getElementById('widgetPhotoCountHint');
+      if (hintEl) {
+        hintEl.textContent = state.photos.length > 2 ? `${state.photos.length}장 · 좌우 스크롤` : `${state.photos.length}장`;
+      }
       const grid = document.getElementById('sharedPhotoPreviewGrid');
 
-      if (recent.length === 0) {
-        grid.innerHTML = `<div class="col-span-2 flex items-center justify-center text-[11px] text-surface-muted bg-slate-50 rounded-lg">공유된 사진이 없습니다.</div>`;
+      if (state.photos.length === 0) {
+        grid.innerHTML = `<div class="w-full flex items-center justify-center text-[11px] text-surface-muted bg-slate-50 rounded-lg">공유된 사진이 없습니다.</div>`;
         return;
       }
 
-      grid.innerHTML = recent.map(ph => {
+      grid.innerHTML = state.photos.map(ph => {
         const meta = FAMILY_META[ph.uploader] || FAMILY_META.mom;
         return `
-          <div onclick="openLightbox('${ph.id}')" class="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer h-full min-h-0">
+          <div onclick="openLightbox('${ph.id}')" class="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer h-full min-h-0 shrink-0 w-[calc(50%-3px)] snap-start">
             <img src="${ph.src}" alt="${ph.caption}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
             <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent px-1.5 py-1">
               <div class="flex items-center gap-1">
@@ -2445,6 +2545,26 @@
           </div>
         `;
       }).join('');
+    }
+
+    function downloadPhotoById(photoId) {
+      const ph = state.photos.find(p => p.id === photoId);
+      if (!ph) return;
+      const isSvg = ph.src.startsWith('data:image/svg');
+      const ext = isSvg ? 'svg' : 'jpg';
+      const safeCaption = (ph.caption || '우리사진').replace(/[\\/:*?"<>|]/g, '_').trim();
+      const link = document.createElement('a');
+      link.href = ph.src;
+      link.download = `${safeCaption}_${ph.date || 'photo'}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast(`⬇️ '${ph.caption}' 사진을 다운로드합니다.`);
+    }
+
+    function downloadCurrentLightboxPhoto() {
+      if (!currentLightboxPhotoId) return;
+      downloadPhotoById(currentLightboxPhotoId);
     }
 
     function triggerPhotoUpload() {
@@ -2557,7 +2677,7 @@
       renderSharedAlbumWidget();
       if (state.activeTab === 'album') renderSubView('album');
       closeModal('photoUploadModal');
-      showToast(`사진 ${count}장이 가족 공유 사진첩에 올라갔습니다!`);
+      showToast(`사진 ${count}장이 '우리 사진'에 올라갔습니다!`);
     }
 
     function openLightbox(photoId) {
@@ -2668,25 +2788,29 @@
             </div>
           </div>
         `;
-      } else if (tab === 'todos') {
+        return;
+      }
+
+      if (tab === 'todos') {
         container.innerHTML = `
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-extrabold text-surface-ink">☑️ 우리 가족 전체 할 일</h2>
-            <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-lg">← 대시보드로</button>
+            <h2 class="text-lg font-extrabold text-surface-ink">☑️ 가족 전체 할 일 & 장보기 목록</h2>
+            <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">← 대시보드</button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            ${['jihu', 'seohu', 'parents'].map(grp => {
-              const title = grp === 'jihu' ? '지후의 오늘 미션' : grp === 'seohu' ? '서후의 오늘 미션' : '아빠 · 엄마 체크리스트';
+            ${['jihu', 'seohu', 'parents'].map(g => {
+              const title = g === 'jihu' ? '지후의 오늘 미션' : g === 'seohu' ? '서후의 오늘 미션' : '아빠 · 엄마 할 일';
               return `
                 <div class="border border-slate-200 rounded-xl p-3.5">
-                  <h3 class="text-xs font-extrabold mb-2.5">${title}</h3>
+                  <h3 class="text-xs font-extrabold text-surface-ink mb-2.5">${title}</h3>
                   <div class="space-y-1.5">
-                    ${state.todos[grp].map((t, i) => `
+                    ${state.todos[g].map((t, idx) => `
                       <div class="flex items-center justify-between p-1.5 rounded-lg bg-slate-50">
-                        <button onclick="toggleTodo('${grp}', ${i})" class="text-left text-xs font-bold flex-1 ${t.done ? 'done-text' : ''}">
-                          ${t.done ? '✅' : '⬜'} ${t.text}
+                        <button onclick="toggleTodo('${g}', ${idx})" class="flex items-center gap-2 text-left text-xs font-bold">
+                          <span>${t.done ? '✅' : '⬜'}</span>
+                          <span class="${t.done ? 'done-text' : ''}">${t.text}</span>
                         </button>
-                        <button onclick="deleteTodo('${grp}', ${i})" class="text-xs text-rose-500 px-1">✕</button>
+                        <button onclick="deleteTodo('${g}', ${idx})" class="text-xs text-slate-400 hover:text-rose-500">✕</button>
                       </div>
                     `).join('')}
                   </div>
@@ -2695,51 +2819,64 @@
             }).join('')}
           </div>
         `;
-      } else if (tab === 'schedules') {
+        return;
+      }
+
+      if (tab === 'schedules') {
         const sorted = [...state.schedules].sort((a, b) => a.date.localeCompare(b.date));
         container.innerHTML = `
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-extrabold text-surface-ink">📅 가족 전체 일정</h2>
             <div class="flex gap-2">
-              <button onclick="openScheduleModal()" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">+ 일정 추가</button>
-              <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-lg">← 대시보드로</button>
+              <button onclick="openScheduleModal()" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">+ 새 일정</button>
+              <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-lg">← 대시보드</button>
             </div>
           </div>
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             ${sorted.map(ev => {
               const meta = FAMILY_META[ev.who] || FAMILY_META.family;
               return `
-                <div class="flex items-center justify-between p-3 rounded-xl border border-slate-200 border-l-4 ${meta.bar} bg-slate-50/50">
-                  <div>
-                    <div class="text-[11px] font-bold text-surface-muted">${ev.date} · ${ev.time} · <span class="text-surface-ink">${meta.name}</span></div>
-                    <div class="text-xs font-extrabold text-surface-ink">${ev.title}</div>
+                <div class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/70">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-xs font-bold px-2 py-0.5 rounded border ${meta.badge}">${meta.name}</span>
+                    <span class="text-xs font-bold text-surface-muted">${ev.date} · ${ev.time}</span>
+                    <span class="text-sm font-extrabold text-surface-ink">${ev.title}</span>
                   </div>
-                  <button onclick="deleteSchedule('${ev.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded">삭제</button>
+                  <button onclick="deleteSchedule('${ev.id}')" class="text-xs font-bold text-rose-500 hover:underline">삭제</button>
                 </div>
               `;
             }).join('')}
           </div>
         `;
-      } else if (tab === 'album') {
+        return;
+      }
+
+      if (tab === 'album') {
         container.innerHTML = `
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-extrabold text-surface-ink">🖼️ 가족 공유 사진첩 (${state.photos.length}장)</h2>
+            <h2 class="text-lg font-extrabold text-surface-ink">🖼️ 우리 사진 (${state.photos.length}장)</h2>
             <div class="flex gap-2">
-              <button onclick="triggerPhotoUpload()" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">📷 새 사진 올리기</button>
-              <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-lg">← 대시보드로</button>
+              <button onclick="triggerPhotoUpload()" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">+ 사진 올리기</button>
+              <button onclick="switchTab('dashboard')" class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-lg">← 대시보드</button>
             </div>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             ${state.photos.map(ph => {
               const meta = FAMILY_META[ph.uploader] || FAMILY_META.mom;
               return `
-                <div onclick="openLightbox('${ph.id}')" class="group border border-slate-200 rounded-xl overflow-hidden bg-slate-50 cursor-pointer hover:shadow-md transition">
-                  <div class="h-36 overflow-hidden bg-slate-200">
+                <div onclick="openLightbox('${ph.id}')" class="group rounded-xl overflow-hidden border border-slate-200 bg-white shadow-card cursor-pointer">
+                  <div class="h-36 bg-slate-100 overflow-hidden relative">
                     <img src="${ph.src}" alt="${ph.caption}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    <button type="button" onclick="event.stopPropagation(); downloadPhotoById('${ph.id}')" title="사진 다운로드" class="absolute bottom-2 right-2 bg-slate-900/75 hover:bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-lg backdrop-blur transition">
+                      ⬇️ 저장
+                    </button>
                   </div>
-                  <div class="p-2">
+                  <div class="p-2.5">
                     <div class="text-xs font-extrabold text-surface-ink truncate">${ph.caption}</div>
-                    <div class="text-[10px] text-surface-muted mt-0.5">${meta.name} · ${ph.date}</div>
+                    <div class="flex items-center justify-between mt-1">
+                      <span class="text-[10px] font-bold px-1.5 py-0.2 rounded border ${meta.badge}">${meta.name}</span>
+                      <span class="text-[10px] text-surface-muted">${ph.date}</span>
+                    </div>
                   </div>
                 </div>
               `;
@@ -2751,10 +2888,11 @@
 
     // ==================== 9. MODALS & CRUD HELPERS ====================
     function closeModal(id) {
-      const m = document.getElementById(id);
-      if (!m) return;
-      m.classList.add('hidden');
-      m.classList.remove('flex');
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }
     }
 
     function openScheduleModal(defaultWho = 'jihu') {
@@ -2780,7 +2918,7 @@
       renderWeeklyCalendarAndSchedules();
       if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
       closeModal('scheduleModal');
-      showToast('새 일정이 등록되었습니다.');
+      showToast('새 가족 일정이 등록되었습니다.');
     }
 
     function deleteSchedule(id) {
@@ -2801,10 +2939,10 @@
       m.classList.add('flex');
     }
 
-    function openEditNoteModal(id) {
-      const note = state.notes.find(n => n.id === id);
+    function openEditNoteModal(noteId) {
+      const note = state.notes.find(n => n.id === noteId);
       if (!note) return;
-      document.getElementById('noteModalTitle').textContent = '✏️ 가족 메모 수정하기';
+      document.getElementById('noteModalTitle').textContent = '✏️ 가족 메모 수정';
       document.getElementById('noteEditId').value = note.id;
       document.getElementById('noteContentInput').value = note.text;
       document.getElementById('notePinInput').checked = !!note.pinned;
@@ -2818,46 +2956,49 @@
     function saveFamilyNote(e) {
       e.preventDefault();
       const editId = document.getElementById('noteEditId').value;
-      const author = document.querySelector('input[name="noteAuthor"]:checked').value;
+      const author = document.querySelector('input[name="noteAuthor"]:checked')?.value || 'mom';
       const text = document.getElementById('noteContentInput').value.trim();
       const pinned = document.getElementById('notePinInput').checked;
       if (!text) return;
 
-      const now = new Date();
-      const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-
       if (editId) {
-        const idx = state.notes.findIndex(n => n.id === editId);
-        if (idx > -1) state.notes[idx] = { ...state.notes[idx], author, text, pinned };
+        const target = state.notes.find(n => n.id === editId);
+        if (target) {
+          target.author = author;
+          target.text = text;
+          target.pinned = pinned;
+        }
+        showToast('메모가 수정되었습니다.');
       } else {
+        const now = new Date();
+        const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
         state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned, time: timeStr });
+        showToast('가족 메모장에 저장되었습니다.');
       }
 
       saveState();
       renderFamilyNotepad();
       closeModal('noteModal');
-      showToast('가족 메모장에 저장되었습니다.');
     }
 
-    // ==================== 10. VERTICAL SPLIT RESIZER LOGIC ====================
-    const MIN_WIDGET_HEIGHT_PX = 110;
-
+    // ==================== 10. VERTICAL SPLIT RESIZER (LEFT & RIGHT COLUMNS) ====================
     function applySavedSplitRatios() {
-      const ratios = state.splitRatios || { left: 55, right: 55 };
+      const leftPct = Math.min(76, Math.max(24, Number(state.splitRatios?.left) || 55));
+      const rightPct = Math.min(76, Math.max(24, Number(state.splitRatios?.right) || 55));
       const leftTop = document.getElementById('leftTopWidget');
       const rightTop = document.getElementById('rightTopWidget');
-      if (leftTop) leftTop.style.height = `${ratios.left}%`;
-      if (rightTop) rightTop.style.height = `${ratios.right}%`;
+      if (leftTop) leftTop.style.height = `${leftPct}%`;
+      if (rightTop) rightTop.style.height = `${rightPct}%`;
     }
 
     function resetSplitRatios() {
       state.splitRatios = { left: 55, right: 55 };
       applySavedSplitRatios();
       saveState(true);
-      showToast('좌우 위젯 상하 비율이 기본(55:45)으로 초기화되었습니다.');
+      showToast('상하 위젯 비율을 기본값(55:45)으로 초기화했습니다.');
     }
 
-    function initVerticalSplitter(splitterId, containerId, topWidgetId, sideKey) {
+    function initVerticalSplitter(splitterId, containerId, topWidgetId, ratioKey) {
       const splitter = document.getElementById(splitterId);
       const container = document.getElementById(containerId);
       const topWidget = document.getElementById(topWidgetId);
@@ -2865,39 +3006,15 @@
 
       let isDragging = false;
 
-      const getClientY = (e) => {
-        if (e.touches && e.touches.length > 0) return e.touches[0].clientY;
-        return e.clientY;
-      };
-
-      const onStart = (e) => {
-        isDragging = true;
-        splitter.classList.add('dragging');
-        document.body.classList.add('resizing-vertical');
-        if (e.cancelable) e.preventDefault();
-      };
-
-      const onMove = (e) => {
+      const onMove = (clientY) => {
         if (!isDragging) return;
-        const clientY = getClientY(e);
-        if (typeof clientY !== 'number') return;
-
         const rect = container.getBoundingClientRect();
-        const splitterHeight = splitter.offsetHeight || 10;
-        const availableHeight = rect.height - splitterHeight;
-        if (availableHeight <= MIN_WIDGET_HEIGHT_PX * 2) return;
-
-        let newTopPx = clientY - rect.top - (splitterHeight / 2);
-        const maxTopPx = availableHeight - MIN_WIDGET_HEIGHT_PX;
-        newTopPx = Math.max(MIN_WIDGET_HEIGHT_PX, Math.min(maxTopPx, newTopPx));
-
-        const newPercent = Number(((newTopPx / rect.height) * 100).toFixed(2));
-        topWidget.style.height = `${newPercent}%`;
-
-        if (!state.splitRatios) state.splitRatios = { left: 55, right: 55 };
-        state.splitRatios[sideKey] = newPercent;
-
-        if (e.cancelable) e.preventDefault();
+        if (rect.height <= 0) return;
+        const offsetY = clientY - rect.top;
+        let pct = Math.round((offsetY / rect.height) * 1000) / 10;
+        pct = Math.max(24, Math.min(76, pct));
+        topWidget.style.height = `${pct}%`;
+        state.splitRatios[ratioKey] = pct;
       };
 
       const onEnd = () => {
@@ -2908,14 +3025,284 @@
         saveState(true);
       };
 
-      splitter.addEventListener('mousedown', onStart);
-      window.addEventListener('mousemove', onMove);
+      splitter.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        splitter.classList.add('dragging');
+        document.body.classList.add('resizing-vertical');
+      });
+      window.addEventListener('mousemove', (e) => onMove(e.clientY));
       window.addEventListener('mouseup', onEnd);
 
-      splitter.addEventListener('touchstart', onStart, { passive: false });
-      window.addEventListener('touchmove', onMove, { passive: false });
-      window.addEventListener('touchend', onEnd);
-      window.addEventListener('touchcancel', onEnd);
+      splitter.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          isDragging = true;
+          splitter.classList.add('dragging');
+          document.body.classList.add('resizing-vertical');
+        }
+      }, { passive: true });
+      splitter.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length > 0) {
+          e.preventDefault();
+          onMove(e.touches[0].clientY);
+        }
+      }, { passive: false });
+      splitter.addEventListener('touchend', onEnd);
+      splitter.addEventListener('touchcancel', onEnd);
+    }
+
+    // ==================== 10-B. TODAY'S QUIZ (GRADE 5-6 ENGLISH & HISTORY) & WEEKLY SCOREBOARD ====================
+    const FAMILY_QUIZ_BANK = [
+      // 초등 5·6학년 영단어 (English Vocabulary)
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "environment"', options: ['환경', '발명품', '전통', '모험'], ans: 0, exp: 'environment는 우리가 살아가는 자연·생활 "환경"을 뜻하는 초등 6학년 필수 영단어예요!' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "delicious"', options: ['위험한', '맛있는', '부지런한', '조용한'], ans: 1, exp: 'delicious는 음식이 "맛있는"이라는 뜻이에요. (예: This pizza is delicious!)' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"도서관"을 뜻하는 영어 단어는 무엇일까요?', options: ['hospital', 'museum', 'library', 'station'], ans: 2, exp: 'library는 "도서관", museum은 "박물관", hospital은 "병원"이에요.' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "important"', options: ['중요한', '유명한', '궁금한', '친절한'], ans: 0, exp: 'important는 "중요한"이라는 뜻이에요. (famous=유명한, curious=궁금한)' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"발명하다"라는 뜻을 가진 영어 동사는?', options: ['protect', 'invent', 'arrive', 'borrow'], ans: 1, exp: 'invent는 새로운 것을 "발명하다"라는 뜻이에요. 명사형은 invention(발명품)!' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 중 "계절"을 뜻하는 영어 단어는?', options: ['weather', 'season', 'climate', 'island'], ans: 1, exp: 'season은 봄·여름·가을·겨울 "계절"을 뜻하고, weather는 "날씨"예요.' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "brave"', options: ['용감한', '수줍은', '게으른', '정직한'], ans: 0, exp: 'brave는 두려움 없이 "용감한"이라는 뜻이에요. (honest=정직한)' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"이웃"을 뜻하는 영어 단어는 무엇일까요?', options: ['passenger', 'neighbor', 'scientist', 'president'], ans: 1, exp: 'neighbor는 가까이 사는 "이웃"을 뜻해요.' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "protect"', options: ['오염시키다', '보호하다', '낭비하다', '수리하다'], ans: 1, exp: 'protect는 위험으로부터 "보호하다, 지키다"라는 뜻이에요. (Protect the Earth!)' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"건강한"을 뜻하는 영어 형용사는?', options: ['heavy', 'healthy', 'hungry', 'hurry'], ans: 1, exp: 'healthy는 몸과 마음이 "건강한"이라는 뜻이에요.' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "expensive"', options: ['값싼', '비싼', '무거운', '넓은'], ans: 1, exp: 'expensive는 가격이 "비싼"이라는 뜻이고, 반대말은 cheap(값싼)이에요.' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"미래"를 뜻하는 영어 단어는 무엇일까요?', options: ['past', 'present', 'future', 'century'], ans: 2, exp: 'past(과거) - present(현재) - future(미래) 세 단어를 함께 기억해 두세요!' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "experience"', options: ['경험', '실험', '설명', '연습'], ans: 0, exp: 'experience는 직접 겪어보는 "경험"을 뜻해요. (practice=연습)' },
+      { cat: 'english', grade: '초5·6 영단어', q: '"지진"을 뜻하는 영어 단어는 무엇일까요?', options: ['typhoon', 'earthquake', 'volcano', 'flood'], ans: 1, exp: 'earth(땅) + quake(흔들림) = earthquake(지진)입니다!' },
+      { cat: 'english', grade: '초5·6 영단어', q: '다음 영단어의 뜻으로 알맞은 것은? 👉 "celebrate"', options: ['기념하다·축하하다', '초대하다', '준비하다', '결정하다'], ans: 0, exp: 'celebrate는 생일이나 명절을 "축하하다, 기념하다"라는 뜻이에요.' },
+
+      // 초등 5·6학년 한국사 (Korean History)
+      { cat: 'history', grade: '초5·6 한국사', q: '세종대왕이 백성을 위해 창제한 우리 글자의 원래 이름은 무엇일까요?', options: ['훈민정음', '직지심체요절', '팔만대장경', '삼국사기'], ans: 0, exp: '1443년 세종대왕이 창제하고 1446년 반포한 "훈민정음"은 백성을 가르치는 바른 소리라는 뜻이에요!' },
+      { cat: 'history', grade: '초5·6 한국사', q: '임진왜란 때 거북선을 앞세워 한산도 대첩에서 큰 승리를 거둔 장군은?', options: ['강감찬', '을지문덕', '이순신', '김유신'], ans: 2, exp: '충무공 이순신 장군은 학익진 전술을 펼쳐 한산도 대첩에서 왜군을 크게 물리쳤어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '고려 시대에 만들어진 세계에서 가장 오래된 금속 활자 인쇄본은?', options: ['무구정광대다라니경', '직지심체요절', '동의보감', '난중일기'], ans: 1, exp: '청주 흥덕사에서 인쇄된 "직지심체요절(1377년)"은 유네스코 세계기록유산에 등재되어 있어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '정조가 아버지 사도세자의 묘를 옮기고 수원 지역에 쌓은 계획 성곽은?', options: ['남한산성', '행주산성', '수원 화성', '북한산성'], ans: 2, exp: '우리 동네 가까운 수원 화성은 정약용이 거중기를 활용해 과학적으로 설계한 유네스코 세계문화유산이에요!' },
+      { cat: 'history', grade: '초5·6 한국사', q: '삼국 중 한강 유역을 가장 먼저 차지하며 전성기를 누렸던 나라 순서는?', options: ['백제 → 고구려 → 신라', '신라 → 백제 → 고구려', '고구려 → 신라 → 백제', '백제 → 신라 → 고구려'], ans: 0, exp: '4세기 백제(근초고왕) → 5세기 고구려(장수왕) → 6세기 신라(진흥왕) 순서로 한강을 차지했어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '1919년 3월 1일, 온 겨레가 일제의 식민 통치에 맞서 일으킨 만세 운동은?', options: ['동학 농민 운동', '3·1 운동', '4·19 혁명', '6·10 만세 운동'], ans: 1, exp: '1919년 3월 1일 독립선언서를 발표하고 전국에서 "대한 독립 만세"를 외친 평화적 만세 운동이에요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '고구려의 을지문덕 장군이 수나라의 대군을 물리친 전투는 무엇일까요?', options: ['귀주 대첩', '살수 대첩', '명량 대첩', '황산벌 전투'], ans: 1, exp: '612년 을지문덕 장군이 살수(청천강)에서 수나라 30만 별동대를 크게 물리친 전투가 "살수 대첩"이에요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '조선 시대 장영실이 만든, 빗물의 양을 정확히 측정하던 세계 최초의 기구는?', options: ['혼천의', '앙부일구', '측우기', '자격루'], ans: 2, exp: '측우기는 강우량을 과학적으로 측정한 기구이며, 앙부일구는 해시계, 자격루는 물시계예요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '발해를 세운 인물로, 고구려 유민과 말갈족을 이끌고 건국한 왕은?', options: ['대조영', '왕건', '궁예', '견훤'], ans: 0, exp: '698년 대조영이 동모산에서 발해를 건국하여 고구려를 계승하고 "해동성국"으로 발전시켰어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '신라의 삼국 통일 과정에서 활약한 화랑 출신의 명장군은 누구일까요?', options: ['장보고', '김유신', '계백', '연개소문'], ans: 1, exp: '김유신 장군은 태종 무열왕(김춘추)과 힘을 합쳐 신라의 삼국 통일에 큰 공을 세웠어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '대한민국 임시 정부의 주석으로서 독립운동을 이끈 지도자는 누구일까요?', options: ['김구', '안창호', '신채호', '윤봉길'], ans: 0, exp: '백범 김구 선생은 대한민국 임시 정부를 이끌며 조국의 완전한 자주독립을 위해 헌신했어요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '고려의 강감찬 장군이 거란의 3차 침입을 크게 물리친 전투는?', options: ['살수 대첩', '귀주 대첩', '한산도 대첩', '진주 대첩'], ans: 1, exp: '1019년 강감찬 장군이 귀주에서 거란군을 크게 격파한 승리가 "귀주 대첩"이에요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '고조선의 건국 이념으로 "널리 인간 세계를 이롭게 한다"는 뜻의 말은?', options: ['홍익인간', '화랑도', '실사구시', '위정척사'], ans: 0, exp: '단군왕검이 고조선을 세울 때 내세운 건국 이념은 "홍익인간"입니다.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '조선 후기 허준이 백성들이 쉽게 병을 치료할 수 있도록 편찬한 의학책은?', options: ['동의보감', '농사직설', '택리지', '목민심서'], ans: 0, exp: '허준이 완성한 "동의보감"은 유네스코 세계기록유산으로 지정된 자랑스러운 의학 서적이에요.' },
+      { cat: 'history', grade: '초5·6 한국사', q: '1909년 하얼빈 역에서 침략의 원흉 이토 히로부미를 처단한 독립운동가는?', options: ['안중근', '이봉창', '유관순', '홍범도'], ans: 0, exp: '안중근 의사는 하얼빈 역에서 이토 히로부미를 처단하고 동양 평화의 뜻을 알렸어요.' }
+    ];
+
+    let activeQuizPlayer = 'jihu';
+    let activeQuizCategory = 'all';
+    let currentQuizItem = null;
+    let currentQuizAnswered = false;
+    let recentQuizIndexes = [];
+
+    function getCurrentQuizWeekKey() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0 ? -6 : 1 - day);
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + diffToMonday);
+      return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    }
+
+    function ensureQuizScoreboardState() {
+      const currentWeek = getCurrentQuizWeekKey();
+      if (!state.quizScoreboard || state.quizScoreboard.weekKey !== currentWeek) {
+        state.quizScoreboard = {
+          weekKey: currentWeek,
+          scores: { jihu: 0, seohu: 0, dad: 0, mom: 0 },
+          solvedCount: { jihu: 0, seohu: 0, dad: 0, mom: 0 }
+        };
+      }
+      if (!state.quizScoreboard.scores) state.quizScoreboard.scores = { jihu: 0, seohu: 0, dad: 0, mom: 0 };
+      if (!state.quizScoreboard.solvedCount) state.quizScoreboard.solvedCount = { jihu: 0, seohu: 0, dad: 0, mom: 0 };
+      updateQuizHeroLeaderBadge();
+    }
+
+    function updateQuizHeroLeaderBadge() {
+      const badge = document.getElementById('quizHeroLeaderBadge');
+      if (!badge || !state.quizScoreboard) return;
+      const scores = state.quizScoreboard.scores || {};
+      const entries = ['jihu', 'seohu', 'dad', 'mom'].map(k => ({ key: k, score: scores[k] || 0 }));
+      entries.sort((a, b) => b.score - a.score);
+      if (entries[0].score > 0) {
+        badge.textContent = `👑${FAMILY_META[entries[0].key].name}`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function openQuizModal() {
+      ensureQuizScoreboardState();
+      renderQuizScoreboard();
+      selectQuizPlayer(activeQuizPlayer);
+      setQuizCategory(activeQuizCategory, false);
+      if (!currentQuizItem) {
+        nextRandomQuiz();
+      }
+      const m = document.getElementById('quizModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function selectQuizPlayer(playerKey) {
+      activeQuizPlayer = playerKey;
+      document.querySelectorAll('.qplayer-btn').forEach(btn => {
+        const k = btn.dataset.qplayer;
+        const meta = FAMILY_META[k];
+        if (k === playerKey) {
+          btn.className = `qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border-2 border-purple-600 bg-purple-600 text-white shadow-2xs transition`;
+        } else {
+          btn.className = `qplayer-btn px-2.5 py-1 rounded-lg text-xs font-extrabold border ${meta.badge} hover:opacity-90 transition`;
+        }
+      });
+    }
+
+    function setQuizCategory(cat, drawNew = true) {
+      activeQuizCategory = cat;
+      document.querySelectorAll('.qcat-btn').forEach(btn => {
+        if (btn.dataset.qcat === cat) {
+          btn.className = 'qcat-btn px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-white text-purple-700 shadow-2xs transition';
+        } else {
+          btn.className = 'qcat-btn px-2 py-0.5 rounded-md text-[11px] font-bold text-slate-600 hover:text-surface-ink transition';
+        }
+      });
+      if (drawNew) nextRandomQuiz();
+    }
+
+    function nextRandomQuiz() {
+      const pool = FAMILY_QUIZ_BANK.map((item, idx) => ({ item, idx }))
+        .filter(entry => activeQuizCategory === 'all' || entry.item.cat === activeQuizCategory);
+
+      let candidates = pool.filter(entry => !recentQuizIndexes.includes(entry.idx));
+      if (candidates.length === 0) {
+        recentQuizIndexes = [];
+        candidates = pool;
+      }
+
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      recentQuizIndexes.push(chosen.idx);
+      if (recentQuizIndexes.length > 8) recentQuizIndexes.shift();
+
+      currentQuizItem = chosen.item;
+      currentQuizAnswered = false;
+      renderCurrentQuizCard();
+    }
+
+    function renderCurrentQuizCard() {
+      if (!currentQuizItem) return;
+      const isEng = currentQuizItem.cat === 'english';
+      const catBadge = document.getElementById('quizCategoryBadge');
+      catBadge.textContent = isEng ? `🔤 ${currentQuizItem.grade}` : `🏛️ ${currentQuizItem.grade}`;
+      catBadge.className = isEng
+        ? 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800'
+        : 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900';
+
+      document.getElementById('quizQuestionText').textContent = currentQuizItem.q;
+
+      const fb = document.getElementById('quizFeedbackBox');
+      fb.classList.add('hidden');
+
+      const optGrid = document.getElementById('quizOptionsGrid');
+      const numLabels = ['①', '②', '③', '④'];
+      optGrid.innerHTML = currentQuizItem.options.map((opt, idx) => `
+        <button type="button" onclick="submitQuizAnswer(${idx})" id="quizOptBtn_${idx}" class="text-left p-2.5 rounded-xl border border-slate-200 bg-white hover:border-purple-400 hover:bg-purple-50/50 text-xs font-extrabold text-surface-ink transition active:scale-[0.99] flex items-center gap-2">
+          <span class="text-purple-600 font-black">${numLabels[idx]}</span>
+          <span>${opt}</span>
+        </button>
+      `).join('');
+    }
+
+    function submitQuizAnswer(selectedIdx) {
+      if (!currentQuizItem || currentQuizAnswered) return;
+      currentQuizAnswered = true;
+      ensureQuizScoreboardState();
+
+      const isCorrect = selectedIdx === currentQuizItem.ans;
+      const meta = FAMILY_META[activeQuizPlayer] || FAMILY_META.jihu;
+
+      currentQuizItem.options.forEach((_, idx) => {
+        const btn = document.getElementById(`quizOptBtn_${idx}`);
+        if (!btn) return;
+        btn.disabled = true;
+        if (idx === currentQuizItem.ans) {
+          btn.className = 'text-left p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 text-xs font-extrabold flex items-center gap-2';
+        } else if (idx === selectedIdx && !isCorrect) {
+          btn.className = 'text-left p-2.5 rounded-xl border-2 border-rose-400 bg-rose-50 text-rose-800 text-xs font-extrabold flex items-center gap-2 opacity-85';
+        } else {
+          btn.className = 'text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs font-bold flex items-center gap-2 opacity-60';
+        }
+      });
+
+      const fb = document.getElementById('quizFeedbackBox');
+      const fbTitle = document.getElementById('quizFeedbackTitle');
+      const fbExplain = document.getElementById('quizFeedbackExplain');
+      fb.classList.remove('hidden');
+
+      if (isCorrect) {
+        state.quizScoreboard.scores[activeQuizPlayer] = (state.quizScoreboard.scores[activeQuizPlayer] || 0) + 10;
+        state.quizScoreboard.solvedCount[activeQuizPlayer] = (state.quizScoreboard.solvedCount[activeQuizPlayer] || 0) + 1;
+        saveState();
+        renderQuizScoreboard();
+        updateQuizHeroLeaderBadge();
+
+        fb.className = 'rounded-xl p-3 text-xs space-y-1 bg-emerald-50 border border-emerald-200 text-emerald-900';
+        fbTitle.textContent = `🎉 정답입니다! ${meta.name} +10점 획득!`;
+        fbExplain.textContent = currentQuizItem.exp;
+
+        playCelebrationFanfare();
+        launchFireworksParticles();
+        showToast(`🏆 ${meta.name} 정답! 주간 스코어 +10점!`);
+      } else {
+        fb.className = 'rounded-xl p-3 text-xs space-y-1 bg-rose-50 border border-rose-200 text-rose-900';
+        fbTitle.textContent = `아쉬워요! 정답은 "${currentQuizItem.options[currentQuizItem.ans]}" 입니다.`;
+        fbExplain.textContent = currentQuizItem.exp;
+      }
+    }
+
+    function renderQuizScoreboard() {
+      ensureQuizScoreboardState();
+      const grid = document.getElementById('quizScoreboardGrid');
+      if (!grid) return;
+
+      const weekLabel = document.getElementById('quizWeekLabel');
+      if (weekLabel && state.quizScoreboard.weekKey) {
+        weekLabel.textContent = `${state.quizScoreboard.weekKey.slice(5).replace('-', '/')} 주간 누적`;
+      }
+
+      const keys = ['jihu', 'seohu', 'dad', 'mom'];
+      const sorted = [...keys].sort((a, b) => (state.quizScoreboard.scores[b] || 0) - (state.quizScoreboard.scores[a] || 0));
+      const topScore = state.quizScoreboard.scores[sorted[0]] || 0;
+
+      grid.innerHTML = keys.map(k => {
+        const meta = FAMILY_META[k];
+        const score = state.quizScoreboard.scores[k] || 0;
+        const solved = state.quizScoreboard.solvedCount[k] || 0;
+        const isLeader = topScore > 0 && score === topScore;
+
+        return `
+          <div onclick="selectQuizPlayer('${k}')" class="cursor-pointer rounded-xl p-2 text-center border transition ${isLeader ? 'bg-amber-50/90 border-amber-300 shadow-2xs' : 'bg-white border-slate-200 hover:bg-slate-50'}">
+            <div class="flex items-center justify-center gap-1">
+              <span class="w-4 h-4 rounded-full ${meta.avatarBg} text-white text-[9px] font-black flex items-center justify-center">${meta.name[0]}</span>
+              <span class="text-xs font-extrabold text-surface-ink">${meta.name}</span>
+              ${isLeader ? '<span class="text-xs">👑</span>' : ''}
+            </div>
+            <div class="text-base font-black font-clock tabular-nums ${isLeader ? 'text-amber-600' : 'text-purple-700'} mt-1">${score}점</div>
+            <div class="text-[9px] font-bold text-surface-muted">${solved}문제 정답</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function resetWeeklyQuizScores() {
+      state.quizScoreboard = {
+        weekKey: getCurrentQuizWeekKey(),
+        scores: { jihu: 0, seohu: 0, dad: 0, mom: 0 },
+        solvedCount: { jihu: 0, seohu: 0, dad: 0, mom: 0 }
+      };
+      saveState();
+      renderQuizScoreboard();
+      updateQuizHeroLeaderBadge();
+      showToast('이번 주 가족 퀴즈 스코어보드가 0점으로 초기화되었습니다.');
     }
 
     let toastTimer = null;
@@ -2933,6 +3320,7 @@
 
     // ==================== 11. INITIALIZE ====================
     function renderAll() {
+      ensureQuizScoreboardState();
       updateClockAndCheckAlarms();
       updateNextAlarmBadge();
       renderWeeklyCalendarAndSchedules();
@@ -2940,6 +3328,9 @@
       renderTodosAndGroceries();
       renderFamilyLocations();
       renderSharedAlbumWidget();
+      if (!document.getElementById('quizModal')?.classList.contains('hidden')) {
+        renderQuizScoreboard();
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
