@@ -107,6 +107,14 @@
       display: inline-block;
       animation: alarm-shake 0.9s ease-in-out infinite;
     }
+    @keyframes praise-pop {
+      0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+      65% { transform: scale(1.06) translateY(-4px); opacity: 1; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .animate-praise-card {
+      animation: praise-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
     /* Vertical Split Resizer Handle */
     .v-splitter {
       height: 10px;
@@ -930,6 +938,22 @@
     <span id="toastText">저장되었습니다.</span>
   </div>
 
+  <!-- Mission Complete Celebration Fireworks & Praise Popup -->
+  <div id="celebrationOverlay" onclick="closeCelebrationOverlay()" class="fixed inset-0 hidden items-center justify-center p-4 z-[70] pointer-events-auto bg-slate-950/25 backdrop-blur-[1px]">
+    <canvas id="fireworksCanvas" class="fixed inset-0 w-full h-full pointer-events-none"></canvas>
+    <div id="celebrationCard" onclick="event.stopPropagation()" class="relative z-10 bg-white/95 border-2 border-amber-300 rounded-3xl shadow-2xl px-7 py-6 text-center max-w-sm w-full space-y-2.5 animate-praise-card">
+      <div id="celebrationEmoji" class="text-5xl leading-none">🎉💖</div>
+      <div id="celebrationChildBadge" class="inline-block text-xs font-extrabold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">지후 미션 완료!</div>
+      <h2 id="celebrationMainTitle" class="text-2xl font-black text-surface-ink tracking-tight">고마워! 사랑해! 💕</h2>
+      <p id="celebrationMissionText" class="text-xs font-bold text-surface-muted bg-slate-50 rounded-xl px-3 py-2 truncate">오늘 미션 완료</p>
+      <div class="pt-1">
+        <button type="button" onclick="closeCelebrationOverlay()" class="px-5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-xs font-extrabold shadow-md hover:opacity-95 active:scale-95 transition">
+          최고야! 확인 ✨
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
   <script>
     const FAMILY_META = {
@@ -944,8 +968,8 @@
     const HOME_LOCATION = {
       name: '우리 집',
       addr: '경기도 용인시 기흥구 덕영대로2077번길 73-1',
-      lat: 37.27215,
-      lon: 127.07152
+      lat: 37.26965,
+      lon: 127.07368
     };
     const YEONGDEOK_COORDS = HOME_LOCATION;
 
@@ -1835,10 +1859,16 @@
     }
 
     function toggleTodo(group, idx) {
-      state.todos[group][idx].done = !state.todos[group][idx].done;
+      const wasDone = !!state.todos[group][idx].done;
+      state.todos[group][idx].done = !wasDone;
+      const completedText = state.todos[group][idx].text;
       saveState();
       renderTodosAndGroceries();
       if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
+
+      if (!wasDone && (group === 'jihu' || group === 'seohu')) {
+        triggerMissionCelebration(group, completedText);
+      }
     }
 
     function deleteTodo(group, idx) {
@@ -1860,91 +1890,238 @@
     }
 
     function removeGrocery(idx) {
-      const removed = state.groceries.splice(idx, 1)[0];
+      state.groceries.splice(idx, 1);
       saveState();
       renderTodosAndGroceries();
-      showToast(`장보기 완료: '${removed}' 제거`);
+      showToast('장보기 품목을 완료 처리했습니다.');
     }
 
-    // ==================== 6. LIVE FAMILY LOCATIONS ====================
+    // ==================== MISSION CELEBRATION FIREWORKS & PRAISE POPUP ====================
+    const PRAISE_MESSAGES = [
+      { title: '고마워! 사랑해! 💖', emoji: '🎉💖' },
+      { title: '정말 멋져! 최고야! 🌟', emoji: '🎆🌟' },
+      { title: '스스로 해내다니 대단해! 🥰', emoji: '🥳💕' },
+      { title: '엄마 아빠가 너무 자랑스러워! 👏', emoji: '🎊💖' },
+      { title: '오늘도 미션 대성공! 사랑해! 💝', emoji: '✨🎉' }
+    ];
+    let celebrationTimer = null;
+    let fireworksAnimFrame = null;
+
+    function playCelebrationFanfare() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5 E5 G5 C6 E6
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.08 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.38);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.08);
+          osc.stop(ctx.currentTime + i * 0.08 + 0.42);
+        });
+      } catch (e) {}
+    }
+
+    function launchFireworksParticles() {
+      const canvas = document.getElementById('fireworksCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6', '#EC4899', '#FACC15'];
+      const particles = [];
+
+      function createBurst(cx, cy, count) {
+        for (let i = 0; i < count; i++) {
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+          const speed = 3 + Math.random() * 6.5;
+          particles.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1.5,
+            size: 4 + Math.random() * 4.5,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1,
+            decay: 0.013 + Math.random() * 0.01,
+            shape: Math.random() > 0.35 ? 'circle' : 'rect',
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.2
+          });
+        }
+      }
+
+      createBurst(canvas.width * 0.5, canvas.height * 0.38, 65);
+      setTimeout(() => createBurst(canvas.width * 0.28, canvas.height * 0.32, 45), 220);
+      setTimeout(() => createBurst(canvas.width * 0.72, canvas.height * 0.32, 45), 400);
+
+      if (fireworksAnimFrame) cancelAnimationFrame(fireworksAnimFrame);
+
+      function step() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.14; // gentle gravity
+          p.vx *= 0.985;
+          p.alpha -= p.decay;
+          p.rotation += p.rotSpeed;
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          if (p.shape === 'rect') {
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        if (particles.length > 0) {
+          fireworksAnimFrame = requestAnimationFrame(step);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      step();
+    }
+
+    function triggerMissionCelebration(childKey, missionText) {
+      const meta = FAMILY_META[childKey] || FAMILY_META.jihu;
+      const praise = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+
+      const badge = document.getElementById('celebrationChildBadge');
+      badge.textContent = `${meta.name}의 오늘 미션 완료!`;
+      badge.className = `inline-block text-xs font-extrabold px-3 py-1 rounded-full border ${meta.badge}`;
+
+      document.getElementById('celebrationEmoji').textContent = praise.emoji;
+      document.getElementById('celebrationMainTitle').textContent = praise.title;
+      document.getElementById('celebrationMissionText').textContent = `✅ ${missionText}`;
+
+      const card = document.getElementById('celebrationCard');
+      card.classList.remove('animate-praise-card');
+      void card.offsetWidth;
+      card.classList.add('animate-praise-card');
+
+      const overlay = document.getElementById('celebrationOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      playCelebrationFanfare();
+      launchFireworksParticles();
+
+      if (celebrationTimer) clearTimeout(celebrationTimer);
+      celebrationTimer = setTimeout(() => {
+        closeCelebrationOverlay();
+      }, 3200);
+    }
+
+    function closeCelebrationOverlay() {
+      if (celebrationTimer) clearTimeout(celebrationTimer);
+      if (fireworksAnimFrame) cancelAnimationFrame(fireworksAnimFrame);
+      const overlay = document.getElementById('celebrationOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    // ==================== 6. LIVE FAMILY LOCATIONS (WITH REAL GPS & REVERSE GEOCODING) ====================
     function calcDistanceMeters(lat1, lon1, lat2, lon2) {
       if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || typeof lat2 !== 'number' || typeof lon2 !== 'number') return null;
+      const toRad = d => (d * Math.PI) / 180;
       const R = 6371000;
-      const toRad = (deg) => deg * Math.PI / 180;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
     function calcDistanceFromHomeLabel(lat, lon) {
-      const distM = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
-      if (distM === null) return '';
-      if (distM < 150) return '🏠 우리 집';
-      if (distM < 1000) return `집에서 ${Math.round(distM / 10) * 10}m`;
-      return `집에서 ${(distM / 1000).toFixed(1)}km`;
+      const meters = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
+      if (meters === null) return '';
+      if (meters < 150) return '';
+      if (meters < 1000) return `집에서 ${meters}m`;
+      return `집에서 ${(meters / 1000).toFixed(1)}km`;
     }
 
     function renderFamilyLocations() {
       const grid = document.getElementById('familyLocationGrid');
-      if (!grid) return;
-      const members = ['jihu', 'seohu', 'dad', 'mom'];
-      let homeCount = 0;
+      const keys = ['jihu', 'seohu', 'dad', 'mom'];
+      let atHomeCount = 0;
 
-      grid.innerHTML = members.map(key => {
-        const meta = FAMILY_META[key];
-        const loc = state.locations[key];
-        const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
-        const isAtHome = loc.status.includes('집') || distLabel === '🏠 우리 집';
-        const isAlba = loc.status.includes('알바');
-        const isMoving = loc.status.includes('이동');
-        if (isAtHome) homeCount++;
+      grid.innerHTML = keys.map(k => {
+        const meta = FAMILY_META[k];
+        const loc = state.locations[k];
+        const isAtHome = loc.status.includes('집');
+        const isMoving = loc.status.includes('이동') || loc.status.includes('알바');
+        if (isAtHome) atHomeCount++;
 
-        const cardBg = isAtHome
-          ? 'bg-emerald-50/85 hover:bg-emerald-100/75 border-emerald-200'
-          : isAlba
-          ? 'bg-amber-50/90 hover:bg-amber-100/80 border-amber-300'
-          : 'bg-white hover:bg-blue-50/70 border-slate-200 hover:border-blue-300';
-
-        const statusBadgeStyle = isAtHome
-          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-          : isAlba
-          ? 'bg-amber-100 text-amber-900 border-amber-300'
-          : isMoving
-          ? 'bg-sky-100 text-sky-800 border-sky-200'
-          : 'bg-blue-50 text-blue-700 border-blue-200';
-
-        const batNum = parseInt(String(loc.battery || '85').replace(/[^0-9]/g, ''), 10) || 85;
+        const distBadge = calcDistanceFromHomeLabel(loc.lat, loc.lon);
+        const batNum = parseInt(String(loc.battery || '85').replace(/\D/g, ''), 10) || 85;
         const batBarColor = batNum <= 20 ? 'bg-rose-500' : batNum <= 45 ? 'bg-amber-400' : 'bg-emerald-500';
 
+        const cardTheme = isAtHome
+          ? 'bg-emerald-50/85 hover:bg-emerald-100/75 border-emerald-200/90'
+          : isMoving
+            ? 'bg-amber-50/75 hover:bg-amber-100/60 border-amber-200/80'
+            : 'bg-white/95 hover:bg-blue-50/60 border-slate-200/90';
+
+        const statusPillClass = isAtHome
+          ? 'bg-emerald-600 text-white'
+          : isMoving
+            ? 'bg-amber-500 text-white'
+            : 'bg-blue-50 text-blue-700 border border-blue-200/80';
+
         return `
-          <button onclick="openLocationModal('${key}')" class="text-left ${cardBg} border rounded-xl px-2.5 py-2 flex flex-col justify-between transition active:scale-95 overflow-hidden shadow-2xs">
+          <button type="button" onclick="openLocationModal('${k}')" class="text-left ${cardTheme} border rounded-xl p-2 flex flex-col justify-between transition shadow-2xs active:scale-[0.98] min-h-0 overflow-hidden">
+            <!-- Top Row: Avatar + Name + Distance Pill -->
             <div class="flex items-center justify-between gap-1 w-full">
               <div class="flex items-center gap-1.5 min-w-0">
-                <span class="w-5 h-5 rounded-full ${meta.avatarBg} text-white text-[10px] font-black flex items-center justify-center shrink-0 shadow-2xs">
-                  ${meta.name.slice(0, 1)}
-                </span>
+                <span class="w-5 h-5 rounded-full ${meta.avatarBg} text-white text-[10px] font-black flex items-center justify-center shrink-0 shadow-2xs">${meta.name[0]}</span>
                 <span class="text-xs font-extrabold text-surface-ink truncate">${meta.name}</span>
               </div>
-              ${distLabel ? `<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${isAtHome ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'} shrink-0">${distLabel}</span>` : ''}
+              ${distBadge
+                ? `<span class="text-[9px] font-extrabold text-slate-600 bg-white/90 border border-slate-200 px-1.5 py-0.2 rounded-full shrink-0">${distBadge}</span>`
+                : `<span class="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-full shrink-0">근처</span>`}
             </div>
 
-            <div class="my-1 w-full space-y-0.5">
-              <div class="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border ${statusBadgeStyle} max-w-full">
+            <!-- Middle Row: Status Pill + Bold Place Name -->
+            <div class="my-auto py-0.5 w-full">
+              <div class="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${statusPillClass} max-w-full">
                 <span>${loc.icon}</span>
                 <span class="truncate">${loc.status}</span>
               </div>
-              <div class="text-[11px] font-bold text-surface-ink truncate pl-0.5">${loc.place}</div>
+              <div class="text-[11px] font-extrabold text-surface-ink truncate mt-1 pl-0.5">${loc.place}</div>
             </div>
 
-            <div class="flex items-center justify-between gap-2 w-full pt-1 border-t border-slate-200/60 text-[9px] font-bold text-slate-500">
+            <!-- Bottom Row: Updated Time + Battery Visual Gauge -->
+            <div class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-200/60 text-[9px] text-surface-muted font-semibold w-full">
               <span class="truncate">${loc.updatedAt || '방금 전'}</span>
               <div class="flex items-center gap-1 shrink-0">
                 <div class="w-6 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div class="h-full ${batBarColor} rounded-full" style="width: ${Math.min(100, Math.max(8, batNum))}%"></div>
+                  <div class="h-full ${batBarColor} rounded-full" style="width: ${Math.min(100, Math.max(10, batNum))}%"></div>
                 </div>
-                <span class="text-slate-600 tabular-nums">${loc.battery || '85%'}</span>
+                <span class="font-extrabold text-slate-600 tabular-nums">${batNum}%</span>
               </div>
             </div>
           </button>
@@ -1953,7 +2130,7 @@
 
       const homePill = document.getElementById('homeCountPill');
       if (homePill) {
-        homePill.textContent = homeCount > 0 ? `🏠 귀가 ${homeCount}명` : '외출 중';
+        homePill.textContent = `🏠 귀가 ${atHomeCount}명`;
       }
     }
 
@@ -2229,7 +2406,13 @@
     function applyLocationPreset(memberKey, presetIdx) {
       const preset = LOCATION_PRESETS[memberKey]?.[presetIdx];
       if (!preset) return;
-      state.locations[memberKey] = { ...preset, updatedAt: '방금 전' };
+      state.locations[memberKey] = {
+        ...preset,
+        lat: preset.status === '집에 있음' ? HOME_LOCATION.lat : preset.lat,
+        lon: preset.status === '집에 있음' ? HOME_LOCATION.lon : preset.lon,
+        addr: preset.status === '집에 있음' ? HOME_LOCATION.addr : preset.addr,
+        updatedAt: '방금 전'
+      };
       saveState();
       renderFamilyLocations();
       if (state.activeTab === memberKey) renderSubView(memberKey);
