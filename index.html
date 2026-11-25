@@ -277,6 +277,10 @@
     </div>
 
     <div class="flex items-center gap-1.5 shrink-0">
+      <button onclick="requestSystemNotificationPermission()" id="notifyPermBtn" class="nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-surface-border shadow-pill text-[11px] font-bold text-surface-ink hover:bg-slate-50 transition active:scale-95">
+        <span id="notifyPermIcon">🔕</span>
+        <span id="notifyPermText">알림 켜기</span>
+      </button>
       <button onclick="openProfileLockModal()" id="profileLockBtn" class="nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-surface-border shadow-pill text-[11px] font-bold text-surface-ink hover:bg-slate-50 transition active:scale-95">
         <span id="profileLockIcon">🔒</span>
         <span id="profileLockText">거실 공용</span>
@@ -1429,61 +1433,52 @@
     let lastCloudRevision = 0;
     let cloudPollTimer = null;
     let isCloudPushing = false;
+    let knownNoteIds = new Set((state.notes || []).map(n => n.id));
+    let knownReplyIds = new Set((state.notes || []).flatMap(n => (n.replies || []).map(r => r.id)));
+    let knownScheduleIds = new Set((state.schedules || []).map(s => s.id));
     let weeklyForecastCache = [];
     let pendingUploadItems = [];
     let currentLightboxPhotoId = null;
-    let lastTriggeredAlarmKey = '';
+    let currentLocModalMember = 'jihu';
+    let lastTriggeredAlarmKey = null;
     let activeRingingAlarm = null;
-    let currentLocationModalMember = 'dad';
-    let leafletMapInstance = null;
-    let leafletMarkersLayer = null;
-    let gpsWatchId = null;
-    const AUTO_GPS_MEMBER_KEY = 'family_board_auto_gps_member_v1';
-
-    function normalizeFirebaseUrl(raw) {
-      if (!raw) return '';
-      const trimmed = raw.trim().replace(/\/+$/, '');
-      if (!trimmed.startsWith('https://')) return '';
-      return trimmed;
-    }
+    let openReplyNoteIds = new Set();
 
     function loadFirebaseDbUrl() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const urlParam = normalizeFirebaseUrl(params.get('db'));
-        if (urlParam) {
-          localStorage.setItem(CLOUD_URL_KEY, urlParam);
-          return urlParam;
+        const urlFromQuery = params.get('db');
+        if (urlFromQuery && urlFromQuery.startsWith('https://')) {
+          const cleaned = urlFromQuery.replace(/\/+$/, '');
+          localStorage.setItem(CLOUD_URL_KEY, cleaned);
+          return cleaned;
         }
-        return normalizeFirebaseUrl(localStorage.getItem(CLOUD_URL_KEY) || '');
+        return (localStorage.getItem(CLOUD_URL_KEY) || '').replace(/\/+$/, '');
       } catch (e) {
         return '';
       }
     }
 
-    function updateCloudStatusUI(mode, customLabel) {
+    function updateCloudStatusUI(status, text) {
       const dot = document.getElementById('cloudStatusDot');
-      const text = document.getElementById('syncStatusText');
-      if (!dot || !text) return;
-
-      if (mode === 'connected') {
+      const label = document.getElementById('syncStatusText');
+      if (label && text) label.textContent = text;
+      if (!dot) return;
+      if (status === 'connected') {
         dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
-        text.textContent = customLabel || '실시간 동기화 중';
-      } else if (mode === 'syncing') {
+      } else if (status === 'syncing') {
         dot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-ping';
-        text.textContent = customLabel || '동기화 중...';
-      } else if (mode === 'error') {
+      } else if (status === 'error') {
         dot.className = 'w-2 h-2 rounded-full bg-rose-500';
-        text.textContent = customLabel || '연결 오류';
       } else {
         dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-        text.textContent = customLabel || '클라우드 연결';
       }
     }
 
     function openCloudSyncModal() {
       if (!requireParentPermission('클라우드 연결 설정')) return;
-      document.getElementById('firebaseUrlInput').value = firebaseDbUrl || '';
+      const input = document.getElementById('firebaseUrlInput');
+      if (input) input.value = firebaseDbUrl || '';
       const m = document.getElementById('cloudSyncModal');
       m.classList.remove('hidden');
       m.classList.add('flex');
@@ -1491,19 +1486,18 @@
 
     async function saveCloudConfig(e) {
       e.preventDefault();
-      const inputVal = document.getElementById('firebaseUrlInput').value;
-      const cleanUrl = normalizeFirebaseUrl(inputVal);
-      if (!cleanUrl) {
-        showToast('https://로 시작하는 올바른 Firebase databaseURL을 입력해 주세요.');
+      if (!requireParentPermission('클라우드 연결 설정')) return;
+      const rawUrl = (document.getElementById('firebaseUrlInput').value || '').trim().replace(/\/+$/, '');
+      if (!rawUrl || !rawUrl.startsWith('https://')) {
+        showToast('올바른 https:// Firebase Realtime Database URL을 입력해 주세요.');
         return;
       }
-
-      firebaseDbUrl = cleanUrl;
+      firebaseDbUrl = rawUrl;
       localStorage.setItem(CLOUD_URL_KEY, firebaseDbUrl);
       updateCloudStatusUI('syncing', '연결 확인 중...');
 
       try {
-        const res = await fetch(`${firebaseDbUrl}/familyBoardData.json`);
+        const res = await fetch(`${firebaseDbUrl}/familyBoard.json`);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const remoteData = await res.json();
 
@@ -1513,25 +1507,26 @@
             ...remoteData.state,
             splitRatios: state.splitRatios || DEFAULT_STATE.splitRatios
           };
+          syncKnownActivityIds();
           lastCloudRevision = remoteData.updatedAt || Date.now();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          applySavedSplitRatios();
           renderAll();
-          showToast('☁️ 기존 가족 보드 데이터를 클라우드에서 불러왔습니다!');
+          if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
         } else {
-          await pushStateToCloud();
-          showToast('☁️ Firebase 연결 완료! 현재 보드 데이터가 업로드되었습니다.');
+          await pushStateToCloud(true);
         }
 
         startCloudPolling();
         closeModal('cloudSyncModal');
+        showToast('☁️ Firebase 실시간 클라우드 동기화가 연결되었습니다!');
       } catch (err) {
-        updateCloudStatusUI('error', '권한/주소 확인');
-        showToast('연결 실패: databaseURL 또는 테스트 모드 권한을 확인해 주세요.');
+        updateCloudStatusUI('error', '연결 오류');
+        showToast('연결 실패: Firebase 규칙(read/write: true)과 URL을 확인해 주세요.');
       }
     }
 
     function disconnectCloudSync() {
+      if (!requireParentPermission('클라우드 연결 해제')) return;
       firebaseDbUrl = '';
       localStorage.removeItem(CLOUD_URL_KEY);
       if (cloudPollTimer) clearInterval(cloudPollTimer);
@@ -1541,44 +1536,40 @@
     }
 
     function copyShareableCloudUrl() {
-      const currentInput = normalizeFirebaseUrl(document.getElementById('firebaseUrlInput').value) || firebaseDbUrl;
-      if (!currentInput) {
-        showToast('먼저 Firebase databaseURL을 입력해 주세요.');
+      if (!firebaseDbUrl) {
+        showToast('먼저 Firebase URL을 입력하고 연결해 주세요.');
         return;
       }
-      const shareUrl = new URL(window.location.href);
-      shareUrl.searchParams.set('db', currentInput);
-      const textArea = document.createElement('textarea');
-      textArea.value = shareUrl.toString();
-      document.body.appendChild(textArea);
-      textArea.select();
+      const baseUrl = window.location.origin + window.location.pathname;
+      const shareUrl = `${baseUrl}?db=${encodeURIComponent(firebaseDbUrl)}`;
+      const ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      document.body.appendChild(ta);
+      ta.select();
       try {
         document.execCommand('copy');
-        showToast('🔗 자동 연결 링크가 복사되었습니다! 가족에게 공유해 보세요.');
+        showToast('🔗 가족 공유 링크가 복사되었습니다! 카톡방에 붙여넣기 하세요.');
       } catch (e) {
         showToast('링크 복사에 실패했습니다.');
       }
-      document.body.removeChild(textArea);
+      document.body.removeChild(ta);
     }
 
-    async function pushStateToCloud() {
+    async function pushStateToCloud(forceImmediate = false) {
       if (!firebaseDbUrl) return;
+      if (isCloudPushing && !forceImmediate) return;
       isCloudPushing = true;
-      updateCloudStatusUI('syncing', '저장 중...');
-      const revision = Date.now();
-      const { activeTab, selectedDate, splitRatios, ...sharedPayload } = state;
-
+      updateCloudStatusUI('syncing', '동기화 중...');
       try {
-        const res = await fetch(`${firebaseDbUrl}/familyBoardData.json`, {
+        const rev = Date.now();
+        lastCloudRevision = rev;
+        const payload = { updatedAt: rev, state };
+        const res = await fetch(`${firebaseDbUrl}/familyBoard.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            updatedAt: revision,
-            state: sharedPayload
-          })
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error('PUT failed');
-        lastCloudRevision = revision;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         updateCloudStatusUI('connected', '실시간 동기화 중');
       } catch (e) {
         updateCloudStatusUI('error', '동기화 지연');
@@ -1590,7 +1581,7 @@
     async function pullStateFromCloud() {
       if (!firebaseDbUrl || isCloudPushing) return;
       try {
-        const res = await fetch(`${firebaseDbUrl}/familyBoardData.json`);
+        const res = await fetch(`${firebaseDbUrl}/familyBoard.json`);
         if (!res.ok) return;
         const remoteData = await res.json();
         if (!remoteData || !remoteData.state) return;
@@ -1607,6 +1598,7 @@
             ...remoteData.state,
             ...keepLocalUi
           };
+          detectAndNotifyRemoteUpdates();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           renderAll();
           if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
@@ -1615,6 +1607,143 @@
       } catch (e) {
         // Silent retry on next interval
       }
+    }
+
+    // ==================== BROWSER SYSTEM NOTIFICATION & QUICK SHARE ====================
+    function syncKnownActivityIds() {
+      knownNoteIds = new Set((state.notes || []).map(n => n.id));
+      knownReplyIds = new Set((state.notes || []).flatMap(n => (n.replies || []).map(r => r.id)));
+      knownScheduleIds = new Set((state.schedules || []).map(s => s.id));
+    }
+
+    function updateNotificationPermUI() {
+      const btn = document.getElementById('notifyPermBtn');
+      const icon = document.getElementById('notifyPermIcon');
+      const text = document.getElementById('notifyPermText');
+      if (!btn || !icon || !text) return;
+
+      if (!('Notification' in window)) {
+        icon.textContent = '🔔';
+        text.textContent = '알림 지원안됨';
+        return;
+      }
+
+      if (Notification.permission === 'granted') {
+        icon.textContent = '🔔';
+        text.textContent = '알림 켜짐';
+        btn.className = 'nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 shadow-pill text-[11px] font-extrabold text-blue-800 transition active:scale-95';
+      } else if (Notification.permission === 'denied') {
+        icon.textContent = '🔕';
+        text.textContent = '알림 차단됨';
+        btn.className = 'nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 shadow-pill text-[11px] font-bold text-rose-700 transition active:scale-95';
+      } else {
+        icon.textContent = '🔔';
+        text.textContent = '알림 켜기';
+        btn.className = 'nav-tab flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-surface-border shadow-pill text-[11px] font-bold text-surface-ink hover:bg-slate-50 transition active:scale-95';
+      }
+    }
+
+    async function requestSystemNotificationPermission() {
+      if (!('Notification' in window)) {
+        showToast('이 기기 브라우저는 시스템 알림 배너를 지원하지 않습니다.');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        playChimeMelody();
+        sendBrowserNotification('🏠 우리 집 가족 보드', '실시간 가족 알림이 정상 작동 중입니다!');
+        showToast('🔔 테스트 알림을 보냈습니다!');
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        showToast('브라우저 주소창 왼쪽 자물쇠 아이콘에서 [알림 허용]을 켜주세요.');
+        return;
+      }
+      const result = await Notification.requestPermission();
+      updateNotificationPermUI();
+      if (result === 'granted') {
+        playChimeMelody();
+        sendBrowserNotification('🏠 우리 집 가족 보드', '이제 새 메모와 일정이 등록되면 알림이 울립니다!');
+        showToast('🔔 가족 실시간 알림이 켜졌습니다!');
+      } else {
+        showToast('알림 권한이 허용되지 않았습니다.');
+      }
+    }
+
+    function sendBrowserNotification(title, body) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      try {
+        const notif = new Notification(title, {
+          body,
+          tag: 'huhu-family-board-alert',
+          renotify: true
+        });
+        notif.onclick = () => {
+          window.focus();
+          notif.close();
+        };
+      } catch (e) {}
+    }
+
+    function detectAndNotifyRemoteUpdates() {
+      const alerts = [];
+
+      (state.notes || []).forEach(n => {
+        if (!knownNoteIds.has(n.id)) {
+          const authorName = (FAMILY_META[n.author] || FAMILY_META.family).name;
+          alerts.push(`📝 [${authorName}] 새 메모: ${n.text}`);
+        }
+        (n.replies || []).forEach(r => {
+          if (!knownReplyIds.has(r.id)) {
+            const repAuthor = (FAMILY_META[r.author] || FAMILY_META.family).name;
+            alerts.push(`💬 [${repAuthor}] 새 댓글: ${r.text}`);
+          }
+        });
+      });
+
+      (state.schedules || []).forEach(s => {
+        if (!knownScheduleIds.has(s.id)) {
+          const whoName = (FAMILY_META[s.who] || FAMILY_META.family).name;
+          alerts.push(`📅 [${whoName}] 새 일정(${s.date} ${s.time}): ${s.title}`);
+        }
+      });
+
+      syncKnownActivityIds();
+
+      if (alerts.length > 0) {
+        const latestMsg = alerts[0];
+        playChimeMelody();
+        showToast(latestMsg);
+        sendBrowserNotification('🏠 우리 집 가족 보드 새 소식', latestMsg);
+      }
+    }
+
+    async function shareFamilyMessage(textToShare) {
+      const shareUrl = window.location.href;
+      const fullPayload = `🏠 [우리 집 가족 보드]\n${textToShare}\n👉 ${shareUrl}`;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: '우리 집 가족 보드',
+            text: fullPayload
+          });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+        }
+      }
+
+      const ta = document.createElement('textarea');
+      ta.value = fullPayload;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('📤 메시지 내용이 복사되었습니다! 카톡방에 붙여넣기 하세요.');
+      } catch (e) {
+        showToast('공유 복사에 실패했습니다.');
+      }
+      document.body.removeChild(ta);
     }
 
     function startCloudPolling() {
@@ -1628,25 +1757,9 @@
       cloudPollTimer = setInterval(pullStateFromCloud, 2500);
     }
 
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
-        const parsed = JSON.parse(raw);
-        return {
-          ...DEFAULT_STATE,
-          ...parsed,
-          alarms: parsed.alarms || DEFAULT_STATE.alarms,
-          splitRatios: parsed.splitRatios || DEFAULT_STATE.splitRatios,
-          quizScoreboard: parsed.quizScoreboard || DEFAULT_STATE.quizScoreboard
-        };
-      } catch (e) {
-        return JSON.parse(JSON.stringify(DEFAULT_STATE));
-      }
-    }
-
     function saveState(skipCloudPush = false) {
       try {
+        syncKnownActivityIds();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         if (firebaseDbUrl && !skipCloudPush) {
           pushStateToCloud();
@@ -2065,6 +2178,7 @@
         const meta = FAMILY_META[ev.who] || FAMILY_META.family;
         const dObj = new Date(ev.date + 'T00:00:00');
         const dateTag = !state.selectedDate ? `${dObj.getMonth() + 1}/${dObj.getDate()}(${WEEKDAYS_KO[dObj.getDay()]}) ` : '';
+        const safeShareText = encodeURIComponent(`📅 [${meta.name} 일정] ${dObj.getMonth() + 1}/${dObj.getDate()}(${WEEKDAYS_KO[dObj.getDay()]}) ${ev.time || ''} - ${ev.title}`);
         return `
           <div class="group flex items-center justify-between gap-1.5 bg-slate-50/90 hover:bg-slate-100 border-l-3 ${meta.bar} rounded-r-lg px-2 py-1" style="border-left-width: 3px;">
             <div class="flex items-center gap-1.5 min-w-0">
@@ -2074,14 +2188,17 @@
                 <span class="font-extrabold text-surface-ink">${ev.title}</span>
               </div>
             </div>
-            <button onclick="deleteSchedule('${ev.id}')" class="opacity-60 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-rose-500 px-1 shrink-0">✕</button>
+            <div class="flex items-center gap-0.5 shrink-0">
+              <button type="button" onclick="shareFamilyMessage(decodeURIComponent('${safeShareText}'))" title="카톡 등으로 공유" class="opacity-60 group-hover:opacity-100 text-[10px] text-slate-500 hover:text-blue-600 px-1">📤</button>
+              <button onclick="deleteSchedule('${ev.id}')" class="opacity-60 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-rose-500 px-1">✕</button>
+            </div>
           </div>
         `;
       }).join('');
     }
 
     function selectWeekDay(iso) {
-      state.selectedDate = state.selectedDate === iso ? null : iso;
+      state.selectedDate = (state.selectedDate === iso) ? null : iso;
       renderWeeklyCalendarAndSchedules();
     }
 
@@ -2090,55 +2207,55 @@
       renderWeeklyCalendarAndSchedules();
     }
 
-    // ==================== 4. FAMILY NOTEPAD ('가족 메모장') ====================
-    let openReplyBoxNoteId = null;
-
+    // ==================== 4. FAMILY NOTEPAD & REPLIES ====================
     function renderFamilyNotepad() {
-      const sorted = [...state.notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-      const grid = document.getElementById('familyNotepadGrid');
+      const container = document.getElementById('familyNotepadGrid');
+      if (!container) return;
 
+      const sorted = [...(state.notes || [])].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
       if (sorted.length === 0) {
-        grid.innerHTML = `<div class="text-[11px] text-surface-muted text-center py-4 bg-slate-50 rounded-lg">작성된 메모가 없어요. 위 입력창에서 바로 남겨보세요!</div>`;
+        container.innerHTML = `<div class="text-[11px] text-surface-muted py-4 text-center bg-slate-50 rounded-lg">등록된 가족 메모가 없습니다. 위 입력창에 메모를 남겨보세요!</div>`;
         return;
       }
 
-      grid.innerHTML = sorted.map(note => {
-        const meta = FAMILY_META[note.author] || FAMILY_META.mom;
-        const cardStyle = note.pinned
-          ? 'bg-amber-50/80 border-amber-200'
-          : 'bg-slate-50/80 border-slate-200/80';
-        const replies = Array.isArray(note.replies) ? note.replies : [];
-        const isReplyOpen = openReplyBoxNoteId === note.id;
+      const effAuthor = getEffectiveAuthor();
+      const effMeta = FAMILY_META[effAuthor] || FAMILY_META.family;
+
+      container.innerHTML = sorted.map(note => {
+        const meta = FAMILY_META[note.author] || FAMILY_META.family;
+        const cardStyle = note.pinned ? 'bg-amber-50/75 border-amber-200' : 'bg-slate-50/80 border-slate-200/80';
+        const replies = note.replies || [];
+        const isReplyOpen = openReplyNoteIds.has(note.id);
+        const allowEditOrDelNote = canDeleteItem(note.author);
+        const safeNoteShare = encodeURIComponent(`📝 [${meta.name} 메모] ${note.text}`);
 
         const repliesHtml = replies.length > 0 ? `
-          <div class="mt-1.5 pl-2.5 border-l-2 border-slate-300/80 space-y-1">
-            ${replies.map(rep => {
-              const rMeta = FAMILY_META[rep.author] || FAMILY_META.jihu;
-              const allowDelRep = canDeleteItem(rep.author);
+          <div class="mt-1.5 pl-2.5 border-l-2 border-slate-200 space-y-1">
+            ${replies.map(r => {
+              const rMeta = FAMILY_META[r.author] || FAMILY_META.family;
+              const canDelReply = canDeleteItem(r.author);
               return `
-                <div class="group/rep flex items-start justify-between gap-1.5 bg-white/85 border border-slate-200/70 rounded-md px-2 py-1">
-                  <div class="min-w-0 flex-1 text-[10px] leading-snug">
+                <div class="flex items-start justify-between gap-1.5 bg-white/90 rounded px-2 py-1 text-[10px]">
+                  <div class="min-w-0 flex-1">
                     <span class="font-extrabold px-1 py-0.2 rounded border ${rMeta.badge} mr-1">${rMeta.name}</span>
-                    <span class="font-semibold text-surface-ink break-words">${rep.text}</span>
-                    <span class="text-[9px] text-surface-muted ml-1">${rep.time || ''}</span>
+                    <span class="font-semibold text-surface-ink break-words">${r.text}</span>
+                    <span class="text-[9px] text-slate-400 ml-1">${r.time || ''}</span>
                   </div>
-                  ${allowDelRep ? `<button type="button" onclick="deleteNoteReply('${note.id}', '${rep.id}')" title="댓글 삭제" class="opacity-60 group-hover/rep:opacity-100 text-[9px] text-slate-400 hover:text-rose-600 px-0.5 shrink-0">✕</button>` : ''}
+                  ${canDelReply ? `<button type="button" onclick="deleteNoteReply('${note.id}', '${r.id}')" class="text-slate-400 hover:text-rose-500 shrink-0 px-0.5">✕</button>` : ''}
                 </div>
               `;
             }).join('')}
           </div>
         ` : '';
 
-        const effRepMeta = FAMILY_META[getEffectiveAuthor()] || FAMILY_META.family;
         const replyFormHtml = isReplyOpen ? `
-          <form onsubmit="addNoteReply(event, '${note.id}')" class="mt-1.5 pl-2.5 flex items-center gap-1">
-            <span class="text-[10px] font-extrabold border rounded px-1.5 py-0.5 shrink-0 ${effRepMeta.badge}">${effRepMeta.name}</span>
-            <input id="replyInput_${note.id}" type="text" placeholder="댓글 남기기..." required class="mobile-touch-input flex-1 min-w-0 text-[10px] bg-white border border-blue-200 rounded px-2 py-0.5 focus:outline-none focus:border-blue-400" />
-            <button type="submit" class="mobile-touch-btn px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-700 shrink-0">등록</button>
+          <form onsubmit="submitNoteReply(event, '${note.id}')" class="mt-1.5 flex items-center gap-1">
+            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${effMeta.badge} shrink-0">${effMeta.name}</span>
+            <input id="replyInput_${note.id}" type="text" placeholder="댓글 입력..." class="flex-1 min-w-0 text-[10px] bg-white border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400" />
+            <button type="submit" class="px-2 py-1 rounded bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-700 shrink-0">등록</button>
           </form>
         ` : '';
 
-        const allowEditOrDelNote = canDeleteItem(note.author);
         return `
           <div class="border ${cardStyle} rounded-lg px-2.5 py-1.5">
             <div class="flex items-start justify-between gap-2">
@@ -2154,6 +2271,7 @@
                 <button type="button" onclick="toggleReplyBox('${note.id}')" title="댓글 달기" class="text-[10px] font-bold px-1.5 py-0.5 rounded transition ${isReplyOpen ? 'bg-blue-600 text-white' : 'bg-white/80 hover:bg-blue-50 text-blue-700 border border-slate-200/80'}">
                   💬${replies.length > 0 ? ' ' + replies.length : ''}
                 </button>
+                <button type="button" onclick="shareFamilyMessage(decodeURIComponent('${safeNoteShare}'))" title="카톡 등으로 공유" class="text-[10px] text-slate-400 hover:text-blue-600 px-1">📤</button>
                 ${allowEditOrDelNote ? `
                   <button type="button" onclick="openEditNoteModal('${note.id}')" title="수정" class="text-[10px] text-slate-400 hover:text-blue-600 px-1">✏️</button>
                   <button type="button" onclick="togglePinNote('${note.id}')" title="상단 고정" class="text-[10px] px-1 rounded hover:bg-white ${note.pinned ? 'opacity-100' : 'opacity-40 hover:opacity-100'}">📌</button>
@@ -2166,46 +2284,55 @@
           </div>
         `;
       }).join('');
+    }
 
-      if (openReplyBoxNoteId) {
-        const focusEl = document.getElementById(`replyInput_${openReplyBoxNoteId}`);
-        if (focusEl) focusEl.focus();
-      }
+    function quickInlineAddNote(e) {
+      e.preventDefault();
+      const input = document.getElementById('inlineNoteInput');
+      const text = (input?.value || '').trim();
+      if (!text) return;
+      const author = getEffectiveAuthor();
+      const now = new Date();
+      const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+      state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned: false, time: timeStr, replies: [] });
+      input.value = '';
+      saveState();
+      renderFamilyNotepad();
+      showToast(`'${FAMILY_META[author].name}' 이름으로 메모가 등록되었습니다.`);
     }
 
     function toggleReplyBox(noteId) {
-      openReplyBoxNoteId = (openReplyBoxNoteId === noteId) ? null : noteId;
+      if (openReplyNoteIds.has(noteId)) {
+        openReplyNoteIds.delete(noteId);
+      } else {
+        openReplyNoteIds.add(noteId);
+      }
       renderFamilyNotepad();
+      if (openReplyNoteIds.has(noteId)) {
+        setTimeout(() => document.getElementById(`replyInput_${noteId}`)?.focus(), 40);
+      }
     }
 
-    function addNoteReply(e, noteId) {
+    function submitNoteReply(e, noteId) {
       e.preventDefault();
+      const input = document.getElementById(`replyInput_${noteId}`);
+      const text = (input?.value || '').trim();
+      if (!text) return;
       const note = state.notes.find(n => n.id === noteId);
       if (!note) return;
-      const inputEl = document.getElementById(`replyInput_${noteId}`);
-      const text = inputEl ? inputEl.value.trim() : '';
-      if (!text) return;
-
-      if (!Array.isArray(note.replies)) note.replies = [];
+      if (!note.replies) note.replies = [];
+      const author = getEffectiveAuthor();
       const now = new Date();
       const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-      note.replies.push({
-        id: 'rep_' + Date.now(),
-        author: getEffectiveAuthor(),
-        text,
-        time: timeStr
-      });
-
-      openReplyBoxNoteId = null;
+      note.replies.push({ id: 'rp_' + Date.now(), author, text, time: timeStr });
       saveState();
       renderFamilyNotepad();
-      showToast('💬 메모에 댓글이 등록되었습니다.');
+      showToast('댓글이 등록되었습니다.');
     }
 
     function deleteNoteReply(noteId, replyId) {
       const note = state.notes.find(n => n.id === noteId);
-      if (!note || !Array.isArray(note.replies)) return;
+      if (!note || !note.replies) return;
       const rep = note.replies.find(r => r.id === replyId);
       if (rep && !canDeleteItem(rep.author)) {
         requireParentPermission('다른 가족의 댓글 삭제');
@@ -2217,133 +2344,126 @@
       showToast('댓글이 삭제되었습니다.');
     }
 
-    function quickInlineAddNote(e) {
-      e.preventDefault();
-      const input = document.getElementById('inlineNoteInput');
-      const author = getEffectiveAuthor();
-      const text = input.value.trim();
-      if (!text) return;
-
-      const now = new Date();
-      const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-      state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned: false, time: timeStr, replies: [] });
-      input.value = '';
-      saveState();
-      renderFamilyNotepad();
-      showToast(`'${FAMILY_META[author].name}' 이름으로 메모가 추가되었습니다.`);
-    }
-
-    function togglePinNote(id) {
-      const n = state.notes.find(item => item.id === id);
-      if (!n) return;
-      if (!canDeleteItem(n.author)) {
-        requireParentPermission('메모 상단 고정 변경');
+    function togglePinNote(noteId) {
+      const note = state.notes.find(n => n.id === noteId);
+      if (!note) return;
+      if (!canDeleteItem(note.author)) {
+        requireParentPermission('메모 고정 변경');
         return;
       }
-      n.pinned = !n.pinned;
+      note.pinned = !note.pinned;
       saveState();
       renderFamilyNotepad();
     }
 
-    function deleteNote(id) {
-      const n = state.notes.find(item => item.id === id);
-      if (n && !canDeleteItem(n.author)) {
+    function deleteNote(noteId) {
+      const note = state.notes.find(n => n.id === noteId);
+      if (!note) return;
+      if (!canDeleteItem(note.author)) {
         requireParentPermission('다른 가족의 메모 삭제');
         return;
       }
-      state.notes = state.notes.filter(item => item.id !== id);
+      state.notes = state.notes.filter(n => n.id !== noteId);
       saveState();
       renderFamilyNotepad();
       showToast('메모가 삭제되었습니다.');
     }
 
-    // ==================== 5. FAMILY TO-DOS & GROCERIES ====================
+    // ==================== 5. TODOS, GROCERIES & CELEBRATION FIREWORKS ====================
     function renderTodosAndGroceries() {
-      ['jihu', 'seohu'].forEach(key => {
-        const list = state.todos[key];
-        const remain = list.filter(t => !t.done).length;
-        document.getElementById(`${key}TodoCount`).textContent = `${remain}남음`;
+      ['jihu', 'seohu'].forEach(childKey => {
+        const list = state.todos[childKey] || [];
+        const rem = list.filter(t => !t.done).length;
+        const countEl = document.getElementById(`${childKey}TodoCount`);
+        if (countEl) countEl.textContent = `${rem}/${list.length}`;
 
-        const checkActive = key === 'jihu'
-          ? 'bg-blue-500 border-blue-500 text-white'
-          : 'bg-emerald-500 border-emerald-500 text-white';
-        const checkIdle = key === 'jihu' ? 'border-blue-300 bg-white' : 'border-emerald-300 bg-white';
-
-        document.getElementById(`${key}TodoList`).innerHTML = list.map((item, idx) => `
-          <div class="group flex items-center justify-between gap-1 py-0.5 px-1 rounded hover:bg-slate-50">
-            <button onclick="toggleTodo('${key}', ${idx})" class="flex items-center gap-1.5 text-left min-w-0 flex-1">
-              <span class="w-3.5 h-3.5 rounded border flex items-center justify-center text-[9px] font-bold shrink-0 ${item.done ? checkActive : checkIdle}">
-                ${item.done ? '✓' : ''}
-              </span>
-              <span class="text-[11px] font-semibold truncate ${item.done ? 'done-text' : 'text-surface-ink'}">${item.text}</span>
+        const listEl = document.getElementById(`${childKey}TodoList`);
+        if (!listEl) return;
+        listEl.innerHTML = list.map((t, idx) => `
+          <div class="group flex items-center justify-between gap-1 bg-slate-50/80 hover:bg-slate-100 rounded-lg px-2 py-1">
+            <button type="button" onclick="toggleTodo('${childKey}', ${idx})" class="flex items-center gap-1.5 text-left min-w-0 flex-1">
+              <span class="text-xs shrink-0">${t.done ? '✅' : '⬜'}</span>
+              <span class="text-[11px] font-bold truncate ${t.done ? 'done-text' : 'text-surface-ink'}">${t.text}</span>
             </button>
-            <button onclick="deleteTodo('${key}', ${idx})" class="opacity-50 group-hover:opacity-100 text-[9px] text-slate-400 hover:text-rose-500 px-1">✕</button>
+            <button type="button" onclick="deleteTodo('${childKey}', ${idx})" class="opacity-50 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-rose-500 px-1 shrink-0">✕</button>
           </div>
         `).join('');
       });
 
-      const pList = state.todos.parents;
-      document.getElementById('parentsTodoList').innerHTML = pList.map((item, idx) => `
-        <div class="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shrink-0">
-          <button onclick="toggleTodo('parents', ${idx})" class="flex items-center gap-1 text-[10px] font-semibold">
-            <span>${item.done ? '☑️' : '⬜'}</span>
-            <span class="${item.done ? 'done-text' : 'text-surface-ink'}">${item.text}</span>
-          </button>
-          <button onclick="deleteTodo('parents', ${idx})" class="text-[9px] text-slate-400 hover:text-rose-500">✕</button>
-        </div>
-      `).join('');
+      const parentsList = state.todos.parents || [];
+      const parentsEl = document.getElementById('parentsTodoList');
+      if (parentsEl) {
+        parentsEl.innerHTML = parentsList.map((t, idx) => `
+          <span class="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0">
+            <button type="button" onclick="toggleTodo('parents', ${idx})" class="flex items-center gap-1">
+              <span>${t.done ? '✅' : '⬜'}</span>
+              <span class="${t.done ? 'done-text' : 'text-surface-ink'}">${t.text}</span>
+            </button>
+            <button type="button" onclick="deleteTodo('parents', ${idx})" class="text-slate-400 hover:text-rose-500 ml-0.5">✕</button>
+          </span>
+        `).join('');
+      }
 
-      document.getElementById('groceryCount').textContent = state.groceries.length;
-      document.getElementById('groceryTagList').innerHTML = state.groceries.map((g, idx) => `
-        <button onclick="removeGrocery(${idx})" title="클릭 시 구매 완료 삭제" class="text-[10px] font-bold bg-amber-50 hover:bg-rose-50 hover:text-rose-600 border border-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded-full transition shrink-0">
-          ${g} ×
-        </button>
-      `).join('');
-    }
-
-    function quickAddTodo(e, group) {
-      e.preventDefault();
-      const inputMap = { jihu: 'inputTodoJihu', seohu: 'inputTodoSeohu', parents: 'inputTodoParents' };
-      const el = document.getElementById(inputMap[group]);
-      const val = el.value.trim();
-      if (!val) return;
-      state.todos[group].push({ id: 'td_' + Date.now(), text: val, done: false });
-      el.value = '';
-      saveState();
-      renderTodosAndGroceries();
-      if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
-    }
-
-    function toggleTodo(group, idx) {
-      const wasDone = !!state.todos[group][idx].done;
-      state.todos[group][idx].done = !wasDone;
-      const completedText = state.todos[group][idx].text;
-      saveState();
-      renderTodosAndGroceries();
-      if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
-
-      if (!wasDone && (group === 'jihu' || group === 'seohu')) {
-        triggerMissionCelebration(group, completedText);
+      const groceries = state.groceries || [];
+      const gCount = document.getElementById('groceryCount');
+      if (gCount) gCount.textContent = groceries.length;
+      const gList = document.getElementById('groceryTagList');
+      if (gList) {
+        gList.innerHTML = groceries.map((item, idx) => `
+          <span class="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0">
+            <span>${item}</span>
+            <button type="button" onclick="removeGrocery(${idx})" class="text-amber-600 hover:text-rose-600">✕</button>
+          </span>
+        `).join('');
       }
     }
 
-    function deleteTodo(group, idx) {
-      if (!requireParentPermission('할 일 목록 삭제')) return;
-      state.todos[group].splice(idx, 1);
+    function quickAddTodo(e, groupKey) {
+      e.preventDefault();
+      if (groupKey === 'parents' && !requireParentPermission('부모 할 일 추가')) return;
+      const inputId = groupKey === 'jihu' ? 'inputTodoJihu' : groupKey === 'seohu' ? 'inputTodoSeohu' : 'inputTodoParents';
+      const input = document.getElementById(inputId);
+      const text = (input?.value || '').trim();
+      if (!text) return;
+      state.todos[groupKey].push({ id: 'td_' + Date.now(), text, done: false });
+      input.value = '';
+      saveState();
+      renderTodosAndGroceries();
+      showToast('할 일이 추가되었습니다.');
+    }
+
+    function toggleTodo(groupKey, idx) {
+      const item = state.todos[groupKey]?.[idx];
+      if (!item) return;
+      item.done = !item.done;
       saveState();
       renderTodosAndGroceries();
       if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
+
+      if (item.done && (groupKey === 'jihu' || groupKey === 'seohu')) {
+        triggerMissionCelebration(groupKey, item.text);
+      }
+    }
+
+    function deleteTodo(groupKey, idx) {
+      if (!requireParentPermission('할 일 삭제')) return;
+      state.todos[groupKey].splice(idx, 1);
+      saveState();
+      renderTodosAndGroceries();
+      if (state.activeTab !== 'dashboard') renderSubView(state.activeTab);
+      showToast('항목이 삭제되었습니다.');
     }
 
     function quickAddGrocery(e) {
       e.preventDefault();
-      const el = document.getElementById('inputGrocery');
-      const val = el.value.trim();
+      const input = document.getElementById('inputGrocery');
+      const val = (input?.value || '').trim();
       if (!val) return;
       state.groceries.push(val);
-      el.value = '';
+      input.value = '';
       saveState();
       renderTodosAndGroceries();
+      showToast(`장보기 목록에 '${val}' 추가됨`);
     }
 
     function removeGrocery(idx) {
@@ -2351,38 +2471,35 @@
       state.groceries.splice(idx, 1);
       saveState();
       renderTodosAndGroceries();
-      showToast('장보기 품목을 완료 처리했습니다.');
     }
 
-    // ==================== MISSION CELEBRATION FIREWORKS & PRAISE POPUP ====================
+    // Celebration Fireworks & Praise Popup
+    let celebrationAutoCloseTimer = null;
     const PRAISE_MESSAGES = [
-      { title: '고마워! 사랑해! 💖', emoji: '🎉💖' },
-      { title: '정말 멋져! 최고야! 🌟', emoji: '🎆🌟' },
-      { title: '스스로 해내다니 대단해! 🥰', emoji: '🥳💕' },
-      { title: '엄마 아빠가 너무 자랑스러워! 👏', emoji: '🎊💖' },
-      { title: '오늘도 미션 대성공! 사랑해! 💝', emoji: '✨🎉' }
+      { title: '고마워! 사랑해! 💕', emoji: '🎉💖' },
+      { title: '정말 멋져! 최고야! 🌟', emoji: '🥳✨' },
+      { title: '엄마 아빠가 너무 자랑스러워! 👏', emoji: '🏆💛' },
+      { title: '오늘 미션 클리어! 대단해! 🚀', emoji: '🎊🌈' }
     ];
-    let celebrationTimer = null;
-    let fireworksAnimFrame = null;
 
     function playCelebrationFanfare() {
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
         const ctx = new AudioCtx();
-        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5 E5 G5 C6 E6
-        notes.forEach((freq, i) => {
+        const melody = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        melody.forEach((freq, i) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
-          gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.08 + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.38);
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.09);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + i * 0.09 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.09 + 0.4);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + i * 0.08);
-          osc.stop(ctx.currentTime + i * 0.08 + 0.42);
+          osc.start(ctx.currentTime + i * 0.09);
+          osc.stop(ctx.currentTime + i * 0.09 + 0.42);
         });
       } catch (e) {}
     }
@@ -2390,95 +2507,72 @@
     function launchFireworksParticles() {
       const canvas = document.getElementById('fireworksCanvas');
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-
-      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6', '#EC4899', '#FACC15'];
+      const ctx = canvas.getContext('2d');
+      const colors = ['#F59E0B', '#EC4899', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444'];
       const particles = [];
 
-      function createBurst(cx, cy, count) {
-        for (let i = 0; i < count; i++) {
-          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
-          const speed = 3 + Math.random() * 6.5;
+      const bursts = [
+        { x: canvas.width * 0.5, y: canvas.height * 0.42 },
+        { x: canvas.width * 0.28, y: canvas.height * 0.35 },
+        { x: canvas.width * 0.72, y: canvas.height * 0.35 }
+      ];
+
+      bursts.forEach(b => {
+        for (let i = 0; i < 42; i++) {
+          const angle = (Math.PI * 2 * i) / 42 + (Math.random() - 0.5) * 0.2;
+          const speed = 2.5 + Math.random() * 5.5;
           particles.push({
-            x: cx,
-            y: cy,
+            x: b.x,
+            y: b.y,
             vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed - 1.5,
-            size: 4 + Math.random() * 4.5,
+            vy: Math.sin(angle) * speed - 1.2,
+            size: 4 + Math.random() * 4,
             color: colors[Math.floor(Math.random() * colors.length)],
             alpha: 1,
-            decay: 0.013 + Math.random() * 0.01,
-            shape: Math.random() > 0.35 ? 'circle' : 'rect',
-            rotation: Math.random() * Math.PI * 2,
-            rotSpeed: (Math.random() - 0.5) * 0.2
+            rot: Math.random() * Math.PI
           });
         }
-      }
+      });
 
-      createBurst(canvas.width * 0.5, canvas.height * 0.38, 65);
-      setTimeout(() => createBurst(canvas.width * 0.28, canvas.height * 0.32, 45), 220);
-      setTimeout(() => createBurst(canvas.width * 0.72, canvas.height * 0.32, 45), 400);
-
-      if (fireworksAnimFrame) cancelAnimationFrame(fireworksAnimFrame);
-
+      let frame = 0;
       function step() {
+        frame++;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
+        particles.forEach(p => {
           p.x += p.vx;
           p.y += p.vy;
-          p.vy += 0.14; // gentle gravity
-          p.vx *= 0.985;
-          p.alpha -= p.decay;
-          p.rotation += p.rotSpeed;
-
-          if (p.alpha <= 0) {
-            particles.splice(i, 1);
-            continue;
-          }
-
-          ctx.save();
-          ctx.globalAlpha = Math.max(0, p.alpha);
-          ctx.fillStyle = p.color;
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.rotation);
-          if (p.shape === 'rect') {
+          p.vy += 0.14;
+          p.vx *= 0.98;
+          p.alpha -= 0.015;
+          p.rot += 0.1;
+          if (p.alpha > 0) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
             ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
-          } else {
-            ctx.beginPath();
-            ctx.arc(0, 0, p.size * 0.55, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.restore();
           }
-          ctx.restore();
-        }
-
-        if (particles.length > 0) {
-          fireworksAnimFrame = requestAnimationFrame(step);
-        } else {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        });
+        if (frame < 75) requestAnimationFrame(step);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
-      step();
+      requestAnimationFrame(step);
     }
 
     function triggerMissionCelebration(childKey, missionText) {
       const meta = FAMILY_META[childKey] || FAMILY_META.jihu;
-      const praise = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+      const pick = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
 
+      document.getElementById('celebrationEmoji').textContent = pick.emoji;
       const badge = document.getElementById('celebrationChildBadge');
-      badge.textContent = `${meta.name}의 오늘 미션 완료!`;
+      badge.textContent = `${meta.name} 미션 완료!`;
       badge.className = `inline-block text-xs font-extrabold px-3 py-1 rounded-full border ${meta.badge}`;
-
-      document.getElementById('celebrationEmoji').textContent = praise.emoji;
-      document.getElementById('celebrationMainTitle').textContent = praise.title;
+      document.getElementById('celebrationMainTitle').textContent = pick.title;
       document.getElementById('celebrationMissionText').textContent = `✅ ${missionText}`;
-
-      const card = document.getElementById('celebrationCard');
-      card.classList.remove('animate-praise-card');
-      void card.offsetWidth;
-      card.classList.add('animate-praise-card');
 
       const overlay = document.getElementById('celebrationOverlay');
       overlay.classList.remove('hidden');
@@ -2487,99 +2581,88 @@
       playCelebrationFanfare();
       launchFireworksParticles();
 
-      if (celebrationTimer) clearTimeout(celebrationTimer);
-      celebrationTimer = setTimeout(() => {
-        closeCelebrationOverlay();
-      }, 3200);
+      clearTimeout(celebrationAutoCloseTimer);
+      celebrationAutoCloseTimer = setTimeout(() => closeCelebrationOverlay(), 3200);
     }
 
     function closeCelebrationOverlay() {
-      if (celebrationTimer) clearTimeout(celebrationTimer);
-      if (fireworksAnimFrame) cancelAnimationFrame(fireworksAnimFrame);
-      const overlay = document.getElementById('celebrationOverlay');
-      if (overlay) {
-        overlay.classList.add('hidden');
-        overlay.classList.remove('flex');
-      }
+      clearTimeout(celebrationAutoCloseTimer);
+      closeModal('celebrationOverlay');
     }
 
-    // ==================== 6. LIVE FAMILY LOCATIONS (WITH REAL GPS & REVERSE GEOCODING) ====================
+    // ==================== 6. LIVE FAMILY LOCATION & LEAFLET INTERACTIVE MAP ====================
+    const AUTO_GPS_MEMBER_KEY = 'family_board_auto_gps_member_v1';
+    let autoGpsWatchId = null;
+    let lastMovingGpsPoint = null;
+    let dadContinuousMoveStartTs = null;
+    let leafletMapInstance = null;
+    let leafletMarkersLayer = null;
+
     function calcDistanceMeters(lat1, lon1, lat2, lon2) {
-      if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || typeof lat2 !== 'number' || typeof lon2 !== 'number') return null;
-      const toRad = d => (d * Math.PI) / 180;
       const R = 6371000;
+      const toRad = deg => (deg * Math.PI) / 180;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     function calcDistanceFromHomeLabel(lat, lon) {
-      const meters = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
-      if (meters === null) return '';
-      if (meters < 150) return '';
-      if (meters < 1000) return `집에서 ${meters}m`;
-      return `집에서 ${(meters / 1000).toFixed(1)}km`;
+      if (typeof lat !== 'number' || typeof lon !== 'number') return '위치 확인';
+      const dist = calcDistanceMeters(HOME_LOCATION.lat, HOME_LOCATION.lon, lat, lon);
+      if (dist <= 150) return '🏠 집 근처';
+      if (dist < 1000) return `집에서 ${Math.round(dist)}m`;
+      return `집에서 ${(dist / 1000).toFixed(1)}km`;
     }
 
     function renderFamilyLocations() {
       const grid = document.getElementById('familyLocationGrid');
+      if (!grid) return;
+
       const keys = ['jihu', 'seohu', 'dad', 'mom'];
-      let atHomeCount = 0;
+      let homeCount = 0;
 
       grid.innerHTML = keys.map(k => {
         const meta = FAMILY_META[k];
-        const loc = state.locations[k];
-        const isAtHome = loc.status.includes('집');
-        const isMoving = loc.status.includes('이동') || loc.status.includes('알바');
-        if (isAtHome) atHomeCount++;
+        const loc = state.locations[k] || LOCATION_PRESETS[k][0];
+        const isAtHome = loc.status === '집에 있음' || calcDistanceMeters(HOME_LOCATION.lat, HOME_LOCATION.lon, loc.lat, loc.lon) <= 150;
+        if (isAtHome) homeCount++;
 
-        const distBadge = calcDistanceFromHomeLabel(loc.lat, loc.lon);
-        const batNum = parseInt(String(loc.battery || '85').replace(/\D/g, ''), 10) || 85;
-        const batBarColor = batNum <= 20 ? 'bg-rose-500' : batNum <= 45 ? 'bg-amber-400' : 'bg-emerald-500';
-
-        const cardTheme = isAtHome
-          ? 'bg-emerald-50/85 hover:bg-emerald-100/75 border-emerald-200/90'
-          : isMoving
-            ? 'bg-amber-50/75 hover:bg-amber-100/60 border-amber-200/80'
-            : 'bg-white/95 hover:bg-blue-50/60 border-slate-200/90';
-
-        const statusPillClass = isAtHome
-          ? 'bg-emerald-600 text-white'
-          : isMoving
-            ? 'bg-amber-500 text-white'
-            : 'bg-blue-50 text-blue-700 border border-blue-200/80';
+        const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
+        const batNum = parseInt(String(loc.battery || '85').replace('%', ''), 10) || 85;
+        const batColor = batNum <= 25 ? 'bg-rose-500' : batNum <= 50 ? 'bg-amber-400' : 'bg-emerald-500';
+        const statusBadgeStyle = isAtHome
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : (loc.status === '이동중' || loc.status === '알바 중')
+            ? 'bg-amber-50 text-amber-800 border-amber-200'
+            : 'bg-blue-50 text-blue-700 border-blue-200';
 
         return `
-          <button type="button" onclick="openLocationModal('${k}')" class="text-left ${cardTheme} border rounded-xl p-2 flex flex-col justify-between transition shadow-2xs active:scale-[0.98] min-h-0 overflow-hidden">
-            <!-- Top Row: Avatar + Name + Distance Pill -->
+          <button type="button" onclick="openLocationModal('${k}')" class="text-left rounded-xl border ${isAtHome ? 'bg-emerald-50/35 border-emerald-200/90' : 'bg-white/95 border-slate-200/90'} hover:border-blue-400 p-2 flex flex-col justify-between transition shadow-2xs active:scale-[0.99]">
             <div class="flex items-center justify-between gap-1 w-full">
               <div class="flex items-center gap-1.5 min-w-0">
-                <span class="w-5 h-5 rounded-full ${meta.avatarBg} text-white text-[10px] font-black flex items-center justify-center shrink-0 shadow-2xs">${meta.name[0]}</span>
-                <span class="text-xs font-extrabold text-surface-ink truncate">${meta.name}</span>
+                <span class="w-4 h-4 rounded-full ${meta.avatarBg} text-white text-[9px] font-black flex items-center justify-center shrink-0">${meta.name[0]}</span>
+                <span class="text-[11px] font-extrabold text-surface-ink truncate">${meta.name}</span>
               </div>
-              ${distBadge
-                ? `<span class="text-[9px] font-extrabold text-slate-600 bg-white/90 border border-slate-200 px-1.5 py-0.2 rounded-full shrink-0">${distBadge}</span>`
-                : `<span class="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-full shrink-0">근처</span>`}
+              <span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-full shrink-0">${distLabel}</span>
             </div>
 
-            <!-- Middle Row: Status Pill + Bold Place Name -->
-            <div class="my-auto py-0.5 w-full">
-              <div class="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${statusPillClass} max-w-full">
-                <span>${loc.icon}</span>
+            <div class="my-1 min-w-0 w-full">
+              <span class="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border ${statusBadgeStyle} max-w-full truncate">
+                <span>${loc.icon || '📍'}</span>
                 <span class="truncate">${loc.status}</span>
-              </div>
-              <div class="text-[11px] font-extrabold text-surface-ink truncate mt-1 pl-0.5">${loc.place}</div>
+              </span>
+              <div class="text-[10px] font-bold text-surface-ink truncate mt-0.5">${loc.place}</div>
             </div>
 
-            <!-- Bottom Row: Updated Time + Battery Visual Gauge -->
-            <div class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-200/60 text-[9px] text-surface-muted font-semibold w-full">
-              <span class="truncate">${loc.updatedAt || '방금 전'}</span>
+            <div class="flex items-center justify-between gap-1.5 w-full pt-0.5 border-t border-slate-100">
+              <span class="text-[9px] font-semibold text-surface-muted truncate">${loc.updatedAt || '방금 전'}</span>
               <div class="flex items-center gap-1 shrink-0">
-                <div class="w-6 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div class="h-full ${batBarColor} rounded-full" style="width: ${Math.min(100, Math.max(10, batNum))}%"></div>
+                <div class="w-7 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full ${batColor}" style="width: ${Math.min(100, Math.max(10, batNum))}%"></div>
                 </div>
-                <span class="font-extrabold text-slate-600 tabular-nums">${batNum}%</span>
+                <span class="text-[9px] font-bold text-slate-600 tabular-nums">${batNum}%</span>
               </div>
             </div>
           </button>
@@ -2587,143 +2670,136 @@
       }).join('');
 
       const homePill = document.getElementById('homeCountPill');
-      if (homePill) {
-        homePill.textContent = `🏠 귀가 ${atHomeCount}명`;
-      }
+      if (homePill) homePill.textContent = `🏠 귀가 ${homeCount}명`;
     }
 
-    function renderLeafletFamilyMap(activeMemberKey) {
-      const mapEl = document.getElementById('realLeafletMap');
-      if (!mapEl || typeof L === 'undefined') return;
-
-      const activeLoc = state.locations[activeMemberKey] || {};
-      const centerLat = typeof activeLoc.lat === 'number' ? activeLoc.lat : HOME_LOCATION.lat;
-      const centerLon = typeof activeLoc.lon === 'number' ? activeLoc.lon : HOME_LOCATION.lon;
-
-      if (!leafletMapInstance) {
-        leafletMapInstance = L.map('realLeafletMap', { zoomControl: false, attributionControl: false }).setView([centerLat, centerLon], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 18
-        }).addTo(leafletMapInstance);
-        leafletMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
-      } else {
-        leafletMapInstance.setView([centerLat, centerLon], 15);
-      }
-
-      leafletMarkersLayer.clearLayers();
-
-      // Home marker (경기도 용인시 기흥구 덕영대로2077번길 73-1)
-      const homeIcon = L.divIcon({
-        className: '',
-        html: `<div style="background:#0F172A;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:9999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.28);white-space:nowrap;">🏠 우리집</div>`,
-        iconSize: [58, 22],
-        iconAnchor: [29, 11]
-      });
-      L.marker([HOME_LOCATION.lat, HOME_LOCATION.lon], { icon: homeIcon })
-        .bindPopup(`<b>우리 집</b><br>${HOME_LOCATION.addr}`)
-        .addTo(leafletMarkersLayer);
-
-      // Family member markers
-      const colorHexMap = { jihu: '#2563EB', seohu: '#059669', dad: '#334155', mom: '#E11D48' };
-      ['jihu', 'seohu', 'dad', 'mom'].forEach(k => {
-        const loc = state.locations[k];
-        const meta = FAMILY_META[k];
-        if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') return;
-        const isSelected = k === activeMemberKey;
-        const bg = colorHexMap[k] || '#2563EB';
-        const markerIcon = L.divIcon({
-          className: '',
-          html: `<div style="background:${bg};color:#fff;font-size:${isSelected ? '11px' : '10px'};font-weight:800;padding:${isSelected ? '3px 9px' : '2px 7px'};border-radius:9999px;border:${isSelected ? '2.5px solid #FACC15' : '2px solid #fff'};box-shadow:0 3px 8px rgba(0,0,0,0.32);white-space:nowrap;">${loc.icon} ${meta.name}</div>`,
-          iconSize: [68, 24],
-          iconAnchor: [34, 12]
-        });
-        L.marker([loc.lat, loc.lon], { icon: markerIcon })
-          .bindPopup(`<b>${meta.name} (${loc.status})</b><br>${loc.place}`)
-          .addTo(leafletMarkersLayer);
-      });
-
-      setTimeout(() => {
-        if (leafletMapInstance) leafletMapInstance.invalidateSize();
-      }, 80);
-    }
-
-    function openLocationModal(memberKey) {
-      const meta = FAMILY_META[memberKey];
-      const loc = state.locations[memberKey];
-      if (!meta || !loc) return;
-      currentLocationModalMember = memberKey;
-
-      // Render member switcher pills at top of modal
-      const tabsEl = document.getElementById('locModalMemberTabs');
-      if (tabsEl) {
-        tabsEl.innerHTML = ['jihu', 'seohu', 'dad', 'mom'].map(k => {
-          const m = FAMILY_META[k];
-          const active = k === memberKey;
-          return `
-            <button type="button" onclick="openLocationModal('${k}')" class="py-1 px-2 rounded-lg text-xs font-extrabold border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-surface-ink border-slate-200 hover:bg-slate-100'}">
-              ${m.name}
-            </button>
-          `;
-        }).join('');
-      }
+    function openLocationModal(memberKey = 'jihu') {
+      currentLocModalMember = memberKey;
+      const meta = FAMILY_META[memberKey] || FAMILY_META.jihu;
+      const loc = state.locations[memberKey] || LOCATION_PRESETS[memberKey][0];
 
       document.getElementById('locModalBadge').className = `w-3 h-3 rounded-full ${meta.dot}`;
-      document.getElementById('locModalTitle').textContent = `${meta.name} (${meta.role}) 실시간 위치 상세`;
-      document.getElementById('locModalPlaceName').textContent = `${loc.icon} ${loc.place}`;
+      document.getElementById('locModalTitle').textContent = `${meta.name} 실시간 위치 상세`;
+
+      document.getElementById('locModalMemberTabs').innerHTML = ['jihu', 'seohu', 'dad', 'mom'].map(k => {
+        const m = FAMILY_META[k];
+        const active = k === memberKey;
+        return `
+          <button type="button" onclick="openLocationModal('${k}')" class="py-1.5 px-2 rounded-lg text-xs font-extrabold border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-surface-ink border-slate-200 hover:bg-slate-100'}">
+            ${m.name}
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('locModalPlaceName').textContent = loc.place;
       document.getElementById('locModalAddress').textContent = loc.addr;
-      document.getElementById('locModalBattery').textContent = `🔋 ${loc.battery}`;
-      document.getElementById('locModalMovement').textContent = loc.move;
-      document.getElementById('locModalUpdated').textContent = `${loc.updatedAt || '방금 전'} · GPS 정확`;
-
-      const distLabel = calcDistanceFromHomeLabel(loc.lat, loc.lon);
-      const distBadge = document.getElementById('locModalDistanceBadge');
-      if (distBadge) {
-        distBadge.textContent = distLabel || '위치 확인됨';
-      }
-
-      const coordHint = document.getElementById('gpsCoordHint');
-      if (coordHint) {
-        coordHint.textContent = (typeof loc.lat === 'number' && typeof loc.lon === 'number')
-          ? `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`
-          : 'GPS 대기';
-      }
+      document.getElementById('locModalDistanceBadge').textContent = calcDistanceFromHomeLabel(loc.lat, loc.lon);
+      document.getElementById('locModalBattery').textContent = `🔋 ${loc.battery || '85%'}`;
+      document.getElementById('locModalMovement').textContent = loc.move || loc.status;
+      document.getElementById('locModalUpdated').textContent = `${loc.updatedAt || '방금 전'} · GPS`;
 
       const autoChk = document.getElementById('autoTrackGpsCheckbox');
       if (autoChk) {
-        autoChk.checked = localStorage.getItem(AUTO_GPS_MEMBER_KEY) === memberKey;
+        autoChk.checked = (localStorage.getItem(AUTO_GPS_MEMBER_KEY) === memberKey);
+      }
+      const coordHint = document.getElementById('gpsCoordHint');
+      if (coordHint && typeof loc.lat === 'number') {
+        coordHint.textContent = `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`;
       }
 
       const presets = LOCATION_PRESETS[memberKey] || [];
       document.getElementById('locModalPresets').innerHTML = presets.map((p, idx) => `
-        <button onclick="applyLocationPreset('${memberKey}', ${idx})" class="text-left p-2 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition">
+        <button type="button" onclick="applyLocationPreset('${memberKey}', ${idx})" class="text-left p-2 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/60 transition">
           <div class="text-xs font-extrabold text-surface-ink">${p.icon} ${p.status}</div>
           <div class="text-[10px] text-surface-muted truncate">${p.place}</div>
         </button>
       `).join('');
 
-      const modal = document.getElementById('locationModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      renderLeafletFamilyMap(memberKey);
+      const m = document.getElementById('locationModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+
+      setTimeout(() => renderLeafletFamilyMap(memberKey), 60);
+    }
+
+    function renderLeafletFamilyMap(focusMemberKey) {
+      if (typeof L === 'undefined') return;
+      const mapEl = document.getElementById('realLeafletMap');
+      if (!mapEl) return;
+
+      const focusLoc = state.locations[focusMemberKey] || HOME_LOCATION;
+      const centerLat = typeof focusLoc.lat === 'number' ? focusLoc.lat : HOME_LOCATION.lat;
+      const centerLon = typeof focusLoc.lon === 'number' ? focusLoc.lon : HOME_LOCATION.lon;
+
+      if (!leafletMapInstance) {
+        leafletMapInstance = L.map('realLeafletMap', { zoomControl: false }).setView([centerLat, centerLon], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(leafletMapInstance);
+        leafletMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
+      } else {
+        leafletMapInstance.invalidateSize();
+        leafletMapInstance.setView([centerLat, centerLon], 15);
+      }
+
+      leafletMarkersLayer.clearLayers();
+
+      // Home Pin
+      const homeIcon = L.divIcon({
+        className: '',
+        html: `<div style="background:#10B981;color:#fff;font-size:10px;font-weight:900;padding:2px 6px;border-radius:999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">🏠 우리집</div>`,
+        iconSize: [64, 22],
+        iconAnchor: [32, 11]
+      });
+      L.marker([HOME_LOCATION.lat, HOME_LOCATION.lon], { icon: homeIcon })
+        .bindPopup(`<strong>🏠 우리 집</strong><br/>${HOME_LOCATION.addr}`)
+        .addTo(leafletMarkersLayer);
+
+      // Family Pins
+      const pinColors = { jihu: '#2563EB', seohu: '#059669', dad: '#334155', mom: '#E11D48' };
+      ['jihu', 'seohu', 'dad', 'mom'].forEach(k => {
+        const l = state.locations[k];
+        if (!l || typeof l.lat !== 'number') return;
+        const isFocus = k === focusMemberKey;
+        const mIcon = L.divIcon({
+          className: '',
+          html: `<div style="background:${pinColors[k]};color:#fff;font-size:10px;font-weight:900;padding:2px 7px;border-radius:999px;border:${isFocus ? '2.5px solid #FACC15' : '2px solid #fff'};box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;">${FAMILY_META[k].name}</div>`,
+          iconSize: [48, 22],
+          iconAnchor: [24, 11]
+        });
+        L.marker([l.lat, l.lon], { icon: mIcon })
+          .bindPopup(`<strong>${FAMILY_META[k].name}</strong> (${l.status})<br/>${l.place}`)
+          .addTo(leafletMarkersLayer);
+      });
+    }
+
+    function applyLocationPreset(memberKey, presetIdx) {
+      const preset = LOCATION_PRESETS[memberKey]?.[presetIdx];
+      if (!preset) return;
+      state.locations[memberKey] = {
+        ...preset,
+        updatedAt: '방금 전'
+      };
+      saveState();
+      renderFamilyLocations();
+      openLocationModal(memberKey);
+      showToast(`${FAMILY_META[memberKey].name} 위치가 '${preset.status}'(으)로 변경되었습니다.`);
     }
 
     async function reverseGeocodeKorean(lat, lon) {
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=ko`);
-        if (!res.ok) throw new Error('Reverse geocode failed');
         const data = await res.json();
-        const a = data.address || {};
-        const city = a.city || a.county || a.province || '';
-        const district = a.borough || a.suburb || a.city_district || '';
-        const dong = a.quarter || a.neighbourhood || a.village || a.town || a.road || '';
-        const shortPlace = [district, dong].filter(Boolean).join(' ') || city || '현재 GPS 위치';
-        const fullAddr = [city, district, dong].filter(Boolean).join(' ') || data.display_name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        return { shortPlace, fullAddr };
+        const addr = data.address || {};
+        const city = addr.city || addr.county || '';
+        const district = addr.borough || addr.suburb || addr.quarter || addr.neighbourhood || '';
+        const road = addr.road || '';
+        const place = data.name || road || district || '현재 GPS 위치';
+        const fullAddr = [city, district, road].filter(Boolean).join(' ') || data.display_name || '대한민국';
+        return { place, addr: fullAddr };
       } catch (e) {
-        return {
-          shortPlace: `위도 ${lat.toFixed(4)}, 경도 ${lon.toFixed(4)}`,
-          fullAddr: `GPS 좌표 (${lat.toFixed(5)}, ${lon.toFixed(5)})`
-        };
+        return { place: '실시간 GPS 위치', addr: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
       }
     }
 
@@ -2737,171 +2813,134 @@
       return '85%';
     }
 
-    async function updateMemberLocationFromCoords(memberKey, lat, lon, silent = false, isContinuousTracking = false) {
-      const prevLoc = state.locations[memberKey] || {};
+    async function applyRealGpsCoordinates(memberKey, lat, lon, isContinuousWatch = false) {
+      const distFromHome = calcDistanceMeters(HOME_LOCATION.lat, HOME_LOCATION.lon, lat, lon);
       const geo = await reverseGeocodeKorean(lat, lon);
-      const batteryLabel = await getDeviceBatteryLabel();
+      const battery = await getDeviceBatteryLabel();
       const now = new Date();
-      const nowMs = now.getTime();
       const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} 갱신`;
 
-      const distFromHome = calcDistanceMeters(lat, lon, HOME_LOCATION.lat, HOME_LOCATION.lon);
-      const movedMeters = calcDistanceMeters(prevLoc.lat, prevLoc.lon, lat, lon);
+      let status = '실시간 GPS 위치';
+      let icon = '📡';
+      let move = `📍 ${geo.place} 체류 중`;
 
-      let statusText = '실시간 GPS 위치';
-      let statusIcon = '📡';
-      let moveDetail = `📡 실제 스마트폰 GPS (${timeLabel})`;
-      let placeName = geo.shortPlace;
-      let fullAddress = geo.fullAddr;
-      let movingStartedAt = prevLoc.movingStartedAt || null;
-
-      if (distFromHome !== null && distFromHome < 150) {
-        statusText = '집에 있음';
-        statusIcon = '🏠';
-        placeName = '우리 집';
-        fullAddress = HOME_LOCATION.addr;
-        moveDetail = `🏠 귀가 완료 (${timeLabel})`;
-        movingStartedAt = null;
-      } else if (isContinuousTracking && movedMeters !== null && movedMeters >= 40) {
-        if (!movingStartedAt) movingStartedAt = nowMs;
-        const movingMinutes = Math.floor((nowMs - movingStartedAt) / 60000);
-
-        if (memberKey === 'dad' && movingMinutes >= 30) {
-          statusText = '알바 중';
-          statusIcon = '💼';
-          moveDetail = `💼 연속 이동 ${movingMinutes}분 경과 · 알바 중 (${timeLabel})`;
-        } else {
-          statusText = '이동중';
-          statusIcon = memberKey === 'dad' ? '🚗' : '🚶';
-          moveDetail = `${statusIcon} 실시간 이동중 (${movingMinutes > 0 ? movingMinutes + '분째 · ' : ''}${timeLabel})`;
-        }
-      } else {
-        if (movedMeters !== null && movedMeters < 25) {
-          movingStartedAt = null;
+      if (distFromHome <= 150) {
+        status = '집에 있음';
+        icon = '🏠';
+        move = '🏠 귀가 완료';
+        geo.place = '우리 집';
+        geo.addr = HOME_LOCATION.addr;
+        if (memberKey === 'dad') dadContinuousMoveStartTs = null;
+      } else if (isContinuousWatch && lastMovingGpsPoint && lastMovingGpsPoint.memberKey === memberKey) {
+        const movedMeters = calcDistanceMeters(lastMovingGpsPoint.lat, lastMovingGpsPoint.lon, lat, lon);
+        if (movedMeters >= 40) {
+          if (memberKey === 'dad') {
+            if (!dadContinuousMoveStartTs) dadContinuousMoveStartTs = Date.now();
+            const elapsedMin = Math.floor((Date.now() - dadContinuousMoveStartTs) / 60000);
+            if (elapsedMin >= 30) {
+              status = '알바 중';
+              icon = '💼';
+              move = `💼 ${elapsedMin}분 연속 이동 · 알바 중`;
+            } else {
+              status = '이동중';
+              icon = '🚗';
+              move = `🚗 차량 이동중 (${elapsedMin}분 경과)`;
+            }
+          } else {
+            status = '이동중';
+            icon = '🚶';
+            move = '🚶 이동중';
+          }
+        } else if (memberKey === 'dad') {
+          dadContinuousMoveStartTs = null;
         }
       }
 
+      lastMovingGpsPoint = { memberKey, lat, lon, ts: Date.now() };
       state.locations[memberKey] = {
-        status: statusText,
-        place: placeName,
-        addr: fullAddress,
-        move: moveDetail,
-        battery: batteryLabel,
-        icon: statusIcon,
+        status,
+        place: geo.place,
+        addr: geo.addr,
+        move,
+        battery,
+        icon,
         lat,
         lon,
-        movingStartedAt,
         updatedAt: timeLabel
       };
-
       saveState();
       renderFamilyLocations();
-      if (state.activeTab === memberKey) renderSubView(memberKey);
-      if (!document.getElementById('locationModal').classList.contains('hidden') && currentLocationModalMember === memberKey) {
+      if (!document.getElementById('locationModal').classList.contains('hidden') && currentLocModalMember === memberKey) {
         openLocationModal(memberKey);
-      }
-      if (!silent) {
-        showToast(`📡 ${FAMILY_META[memberKey].name} 위치가 '${placeName}'(${statusText})로 업데이트되었습니다!`);
       }
     }
 
     function syncMemberRealGps() {
-      const memberKey = currentLocationModalMember;
-      if (!('geolocation' in navigator)) {
-        showToast('이 기기 브라우저는 GPS 위치 조회를 지원하지 않습니다.');
+      if (!navigator.geolocation) {
+        showToast('이 브라우저에서는 GPS 위치 기능을 지원하지 않습니다.');
         return;
       }
-      const btn = document.getElementById('btnSyncRealGps');
-      if (btn) btn.innerHTML = '<span>⏳</span><span>GPS 좌표 및 동네 주소 조회 중...</span>';
-
+      const memberKey = currentLocModalMember;
+      showToast(`📡 ${FAMILY_META[memberKey].name} 스마트폰 GPS 위치를 조회 중입니다...`);
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          await updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, false, false);
-          if (btn) btn.innerHTML = '<span>📡</span><span>내 스마트폰 실제 GPS 위치로 즉시 갱신</span>';
+          await applyRealGpsCoordinates(memberKey, pos.coords.latitude, pos.coords.longitude, false);
+          showToast(`✅ ${FAMILY_META[memberKey].name} 실제 위치가 업데이트되었습니다!`);
         },
-        (err) => {
-          if (btn) btn.innerHTML = '<span>📡</span><span>내 스마트폰 실제 GPS 위치로 즉시 갱신</span>';
-          showToast('위치 권한을 허용해 주세요 (브라우저 주소창 자물쇠 > 위치 허용).');
+        () => {
+          showToast('위치 권한이 차단되었거나 GPS 신호를 잡을 수 없습니다.');
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     }
 
-    function toggleAutoTrackMemberGps(enabled) {
-      const memberKey = currentLocationModalMember;
-      if (enabled) {
+    function toggleAutoTrackMemberGps(checked) {
+      const memberKey = currentLocModalMember;
+      if (checked) {
         localStorage.setItem(AUTO_GPS_MEMBER_KEY, memberKey);
         startAutoGpsWatcher(memberKey);
-        syncMemberRealGps();
-        showToast(`🔄 이제 이 폰이 이동하면 '${FAMILY_META[memberKey].name}' 위치가 자동 갱신됩니다.`);
+        showToast(`🔄 ${FAMILY_META[memberKey].name} 기기 자동 위치 추적이 켜졌습니다.`);
       } else {
         localStorage.removeItem(AUTO_GPS_MEMBER_KEY);
-        if (gpsWatchId !== null && 'geolocation' in navigator) {
-          navigator.geolocation.clearWatch(gpsWatchId);
-          gpsWatchId = null;
+        if (autoGpsWatchId !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(autoGpsWatchId);
+          autoGpsWatchId = null;
         }
-        showToast('자동 위치 추적이 해제되었습니다.');
+        showToast('자동 위치 추적이 꺼졌습니다.');
       }
     }
 
     function startAutoGpsWatcher(memberKey) {
-      if (!memberKey || !('geolocation' in navigator)) return;
-      if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
-      let lastSentAt = 0;
-
-      gpsWatchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const now = Date.now();
-          if (now - lastSentAt < 45 * 1000) return; // Throttle to once every 45s
-          lastSentAt = now;
-          updateMemberLocationFromCoords(memberKey, pos.coords.latitude, pos.coords.longitude, true, true);
-        },
+      if (!navigator.geolocation) return;
+      if (autoGpsWatchId !== null) navigator.geolocation.clearWatch(autoGpsWatchId);
+      autoGpsWatchId = navigator.geolocation.watchPosition(
+        (pos) => applyRealGpsCoordinates(memberKey, pos.coords.latitude, pos.coords.longitude, true),
         () => {},
-        { enableHighAccuracy: true, maximumAge: 20000 }
+        { enableHighAccuracy: true, maximumAge: 15000, timeout: 15000 }
       );
     }
 
-    function applyLocationPreset(memberKey, presetIdx) {
-      const preset = LOCATION_PRESETS[memberKey]?.[presetIdx];
-      if (!preset) return;
-      state.locations[memberKey] = {
-        ...preset,
-        lat: preset.status === '집에 있음' ? HOME_LOCATION.lat : preset.lat,
-        lon: preset.status === '집에 있음' ? HOME_LOCATION.lon : preset.lon,
-        addr: preset.status === '집에 있음' ? HOME_LOCATION.addr : preset.addr,
-        updatedAt: '방금 전'
-      };
-      saveState();
-      renderFamilyLocations();
-      if (state.activeTab === memberKey) renderSubView(memberKey);
-      openLocationModal(memberKey);
-      showToast(`${FAMILY_META[memberKey].name} 위치가 '${preset.status}'(으)로 변경되었습니다.`);
-    }
-
-    // ==================== 7. SHARED PHOTO ALBUM (AUTO-COMPRESSION + MULTI-PHOTO) ====================
+    // ==================== 7. SHARED PHOTO ALBUM ('우리 사진') ====================
     function renderSharedAlbumWidget() {
-      document.getElementById('albumCountBadge').textContent = state.photos.length;
-      const hintEl = document.getElementById('widgetPhotoCountHint');
-      if (hintEl) {
-        hintEl.textContent = state.photos.length > 2 ? `${state.photos.length}장 · 좌우 스크롤` : `${state.photos.length}장`;
-      }
+      const countBadge = document.getElementById('albumCountBadge');
+      if (countBadge) countBadge.textContent = state.photos.length;
+
       const grid = document.getElementById('sharedPhotoPreviewGrid');
+      if (!grid) return;
 
       if (state.photos.length === 0) {
-        grid.innerHTML = `<div class="w-full flex items-center justify-center text-[11px] text-surface-muted bg-slate-50 rounded-lg">공유된 사진이 없습니다.</div>`;
+        grid.innerHTML = `<div class="w-full h-full flex items-center justify-center text-[11px] text-surface-muted bg-slate-50 rounded-lg">올라온 사진이 없습니다. [+ 올리기]를 눌러보세요!</div>`;
         return;
       }
 
       grid.innerHTML = state.photos.map(ph => {
         const meta = FAMILY_META[ph.uploader] || FAMILY_META.mom;
         return `
-          <div onclick="openLightbox('${ph.id}')" class="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer h-full min-h-0 shrink-0 w-[calc(50%-3px)] snap-start">
+          <div onclick="openLightbox('${ph.id}')" class="relative shrink-0 w-28 sm:w-32 h-full rounded-lg overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer snap-start group">
             <img src="${ph.src}" alt="${ph.caption}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent px-1.5 py-1">
-              <div class="flex items-center gap-1">
-                <span class="text-[9px] font-extrabold text-white bg-white/25 backdrop-blur px-1 rounded shrink-0">${meta.name}</span>
-                <span class="text-[10px] font-bold text-white truncate">${ph.caption}</span>
-              </div>
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-900/40 to-transparent p-1.5">
+              <div class="text-[10px] font-extrabold text-white truncate">${ph.caption}</div>
+              <div class="text-[8px] font-bold text-slate-200">${meta.name} · ${ph.date}</div>
             </div>
           </div>
         `;
@@ -3648,30 +3687,23 @@
       const grid = document.getElementById('quizScoreboardGrid');
       if (!grid) return;
 
-      const weekLabel = document.getElementById('quizWeekLabel');
-      if (weekLabel && state.quizScoreboard.weekKey) {
-        weekLabel.textContent = `${state.quizScoreboard.weekKey.slice(5).replace('-', '/')} 주간 누적`;
-      }
+      const scores = state.quizScoreboard.scores || {};
+      const solved = state.quizScoreboard.solvedCount || {};
+      const members = ['jihu', 'seohu', 'dad', 'mom'].map(k => ({
+        key: k,
+        score: scores[k] || 0,
+        solved: solved[k] || 0
+      }));
+      const maxScore = Math.max(...members.map(m => m.score));
 
-      const keys = ['jihu', 'seohu', 'dad', 'mom'];
-      const sorted = [...keys].sort((a, b) => (state.quizScoreboard.scores[b] || 0) - (state.quizScoreboard.scores[a] || 0));
-      const topScore = state.quizScoreboard.scores[sorted[0]] || 0;
-
-      grid.innerHTML = keys.map(k => {
-        const meta = FAMILY_META[k];
-        const score = state.quizScoreboard.scores[k] || 0;
-        const solved = state.quizScoreboard.solvedCount[k] || 0;
-        const isLeader = topScore > 0 && score === topScore;
-
+      grid.innerHTML = members.map(m => {
+        const meta = FAMILY_META[m.key];
+        const isLeader = maxScore > 0 && m.score === maxScore;
         return `
-          <div onclick="selectQuizPlayer('${k}')" class="cursor-pointer rounded-xl p-2 text-center border transition ${isLeader ? 'bg-amber-50/90 border-amber-300 shadow-2xs' : 'bg-white border-slate-200 hover:bg-slate-50'}">
-            <div class="flex items-center justify-center gap-1">
-              <span class="w-4 h-4 rounded-full ${meta.avatarBg} text-white text-[9px] font-black flex items-center justify-center">${meta.name[0]}</span>
-              <span class="text-xs font-extrabold text-surface-ink">${meta.name}</span>
-              ${isLeader ? '<span class="text-xs">👑</span>' : ''}
-            </div>
-            <div class="text-base font-black font-clock tabular-nums ${isLeader ? 'text-amber-600' : 'text-purple-700'} mt-1">${score}점</div>
-            <div class="text-[9px] font-bold text-surface-muted">${solved}문제 정답</div>
+          <div class="rounded-xl p-2 text-center border ${isLeader ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}">
+            <div class="text-[11px] font-extrabold text-surface-ink">${isLeader ? '👑 ' : ''}${meta.name}</div>
+            <div class="text-sm font-black text-purple-700 font-clock tabular-nums mt-0.5">${m.score}점</div>
+            <div class="text-[9px] font-semibold text-surface-muted">${m.solved}문제 정답</div>
           </div>
         `;
       }).join('');
@@ -3705,6 +3737,7 @@
 
     // ==================== 11. INITIALIZE ====================
     function renderAll() {
+      updateNotificationPermUI();
       updateProfileLockUI();
       ensureQuizScoreboardState();
       updateClockAndCheckAlarms();
