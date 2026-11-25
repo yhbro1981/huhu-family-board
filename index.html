@@ -1128,9 +1128,18 @@
         { id: 's5', date: getIsoDateOffset(3), time: '오전 11:00', title: '광교 호수공원 가족 산책', who: 'family' },
       ],
       notes: [
-        { id: 'n1', author: 'mom', text: '냉장고에 샤인머스캣 씻어뒀으니 학원 가기 전에 간식으로 먹고 출발해~', pinned: true, time: '오전 10:15' },
-        { id: 'n2', author: 'jihu', text: '오늘 5교시 체육 시간이라 체육복 입고 등교했어요!', pinned: false, time: '오전 08:10' },
-        { id: 'n3', author: 'dad', text: '이번 주 토요일에 보드게임 새 거 같이 해보자 🎲', pinned: false, time: '어제 저녁' },
+        {
+          id: 'n1',
+          author: 'mom',
+          text: '냉장고에 샤인머스캣 씻어뒀으니 학원 가기 전에 간식으로 먹고 출발해~',
+          pinned: true,
+          time: '오전 10:15',
+          replies: [
+            { id: 'r1', author: 'jihu', text: '네 엄마! 맛있게 먹고 학원 갈게요 😋', time: '오전 10:22' }
+          ]
+        },
+        { id: 'n2', author: 'jihu', text: '오늘 5교시 체육 시간이라 체육복 입고 등교했어요!', pinned: false, time: '오전 08:10', replies: [] },
+        { id: 'n3', author: 'dad', text: '이번 주 토요일에 보드게임 새 거 같이 해보자 🎲', pinned: false, time: '어제 저녁', replies: [] },
       ],
       todos: {
         jihu: [
@@ -1831,6 +1840,8 @@
     }
 
     // ==================== 4. FAMILY NOTEPAD ('가족 메모장') ====================
+    let openReplyBoxNoteId = null;
+
     function renderFamilyNotepad() {
       const sorted = [...state.notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
       const grid = document.getElementById('familyNotepadGrid');
@@ -1845,25 +1856,110 @@
         const cardStyle = note.pinned
           ? 'bg-amber-50/80 border-amber-200'
           : 'bg-slate-50/80 border-slate-200/80';
+        const replies = Array.isArray(note.replies) ? note.replies : [];
+        const isReplyOpen = openReplyBoxNoteId === note.id;
+
+        const repliesHtml = replies.length > 0 ? `
+          <div class="mt-1.5 pl-2.5 border-l-2 border-slate-300/80 space-y-1">
+            ${replies.map(rep => {
+              const rMeta = FAMILY_META[rep.author] || FAMILY_META.jihu;
+              return `
+                <div class="group/rep flex items-start justify-between gap-1.5 bg-white/85 border border-slate-200/70 rounded-md px-2 py-1">
+                  <div class="min-w-0 flex-1 text-[10px] leading-snug">
+                    <span class="font-extrabold px-1 py-0.2 rounded border ${rMeta.badge} mr-1">${rMeta.name}</span>
+                    <span class="font-semibold text-surface-ink break-words">${rep.text}</span>
+                    <span class="text-[9px] text-surface-muted ml-1">${rep.time || ''}</span>
+                  </div>
+                  <button type="button" onclick="deleteNoteReply('${note.id}', '${rep.id}')" title="댓글 삭제" class="opacity-50 group-hover/rep:opacity-100 text-[9px] text-slate-400 hover:text-rose-600 px-0.5 shrink-0">✕</button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : '';
+
+        const replyFormHtml = isReplyOpen ? `
+          <form onsubmit="addNoteReply(event, '${note.id}')" class="mt-1.5 pl-2.5 flex items-center gap-1">
+            <select id="replyAuthor_${note.id}" class="mobile-touch-input text-[10px] font-bold bg-white border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none">
+              <option value="jihu">지후</option>
+              <option value="seohu">서후</option>
+              <option value="dad">아빠</option>
+              <option value="mom">엄마</option>
+            </select>
+            <input id="replyInput_${note.id}" type="text" placeholder="댓글 남기기..." required class="mobile-touch-input flex-1 min-w-0 text-[10px] bg-white border border-blue-200 rounded px-2 py-0.5 focus:outline-none focus:border-blue-400" />
+            <button type="submit" class="mobile-touch-btn px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-700 shrink-0">등록</button>
+          </form>
+        ` : '';
 
         return `
-          <div class="border ${cardStyle} rounded-lg px-2.5 py-1.5 flex items-start justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5 mb-0.5">
-                <span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${meta.badge}">${meta.name}</span>
-                <span class="text-[9px] text-surface-muted font-medium">${note.time}</span>
-                ${note.pinned ? '<span class="text-[9px]">📌</span>' : ''}
+          <div class="border ${cardStyle} rounded-lg px-2.5 py-1.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                  <span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${meta.badge}">${meta.name}</span>
+                  <span class="text-[9px] text-surface-muted font-medium">${note.time}</span>
+                  ${note.pinned ? '<span class="text-[9px]">📌</span>' : ''}
+                </div>
+                <p class="text-[11px] font-semibold text-surface-ink leading-snug break-words">${note.text}</p>
               </div>
-              <p class="text-[11px] font-semibold text-surface-ink leading-snug break-words">${note.text}</p>
+              <div class="flex items-center gap-0.5 shrink-0">
+                <button type="button" onclick="toggleReplyBox('${note.id}')" title="댓글 달기" class="text-[10px] font-bold px-1.5 py-0.5 rounded transition ${isReplyOpen ? 'bg-blue-600 text-white' : 'bg-white/80 hover:bg-blue-50 text-blue-700 border border-slate-200/80'}">
+                  💬${replies.length > 0 ? ' ' + replies.length : ''}
+                </button>
+                <button type="button" onclick="openEditNoteModal('${note.id}')" title="수정" class="text-[10px] text-slate-400 hover:text-blue-600 px-1">✏️</button>
+                <button type="button" onclick="togglePinNote('${note.id}')" title="상단 고정" class="text-[10px] px-1 rounded hover:bg-white ${note.pinned ? 'opacity-100' : 'opacity-40 hover:opacity-100'}">📌</button>
+                <button type="button" onclick="deleteNote('${note.id}')" title="삭제" class="text-[10px] text-slate-400 hover:text-rose-600 px-1">✕</button>
+              </div>
             </div>
-            <div class="flex items-center gap-0.5 shrink-0">
-              <button onclick="openEditNoteModal('${note.id}')" title="수정" class="text-[10px] text-slate-400 hover:text-blue-600 px-1">✏️</button>
-              <button onclick="togglePinNote('${note.id}')" title="상단 고정" class="text-[10px] px-1 rounded hover:bg-white ${note.pinned ? 'opacity-100' : 'opacity-40 hover:opacity-100'}">📌</button>
-              <button onclick="deleteNote('${note.id}')" title="삭제" class="text-[10px] text-slate-400 hover:text-rose-600 px-1">✕</button>
-            </div>
+            ${repliesHtml}
+            ${replyFormHtml}
           </div>
         `;
       }).join('');
+
+      if (openReplyBoxNoteId) {
+        const focusEl = document.getElementById(`replyInput_${openReplyBoxNoteId}`);
+        if (focusEl) focusEl.focus();
+      }
+    }
+
+    function toggleReplyBox(noteId) {
+      openReplyBoxNoteId = (openReplyBoxNoteId === noteId) ? null : noteId;
+      renderFamilyNotepad();
+    }
+
+    function addNoteReply(e, noteId) {
+      e.preventDefault();
+      const note = state.notes.find(n => n.id === noteId);
+      if (!note) return;
+      const authorEl = document.getElementById(`replyAuthor_${noteId}`);
+      const inputEl = document.getElementById(`replyInput_${noteId}`);
+      const text = inputEl ? inputEl.value.trim() : '';
+      if (!text) return;
+
+      if (!Array.isArray(note.replies)) note.replies = [];
+      const now = new Date();
+      const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      note.replies.push({
+        id: 'rep_' + Date.now(),
+        author: authorEl ? authorEl.value : 'jihu',
+        text,
+        time: timeStr
+      });
+
+      openReplyBoxNoteId = null;
+      saveState();
+      renderFamilyNotepad();
+      showToast('💬 메모에 댓글이 등록되었습니다.');
+    }
+
+    function deleteNoteReply(noteId, replyId) {
+      const note = state.notes.find(n => n.id === noteId);
+      if (!note || !Array.isArray(note.replies)) return;
+      note.replies = note.replies.filter(r => r.id !== replyId);
+      saveState();
+      renderFamilyNotepad();
+      showToast('댓글이 삭제되었습니다.');
     }
 
     function quickInlineAddNote(e) {
@@ -1875,7 +1971,7 @@
 
       const now = new Date();
       const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-      state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned: false, time: timeStr });
+      state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned: false, time: timeStr, replies: [] });
       input.value = '';
       saveState();
       renderFamilyNotepad();
@@ -2972,7 +3068,7 @@
       } else {
         const now = new Date();
         const timeStr = `${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-        state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned, time: timeStr });
+        state.notes.unshift({ id: 'nt_' + Date.now(), author, text, pinned, time: timeStr, replies: [] });
         showToast('가족 메모장에 저장되었습니다.');
       }
 
