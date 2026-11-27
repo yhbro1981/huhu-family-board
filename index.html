@@ -1262,22 +1262,46 @@
     let isParentUnlocked = localStorage.getItem(PARENT_UNLOCKED_KEY) === 'true';
     let pendingTargetUserAfterPin = null;
     let firebaseDbUrl = loadFirebaseDbUrl();
-// ... existing code ... -->
+
+    function normalizeStateArrays(targetState) {
+      if (!targetState || typeof targetState !== 'object') {
+        return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      }
+      if (!targetState.todos || typeof targetState.todos !== 'object') {
+        targetState.todos = { jihu: [], seohu: [], parents: [] };
+      }
+      if (!Array.isArray(targetState.todos.jihu)) targetState.todos.jihu = [];
+      if (!Array.isArray(targetState.todos.seohu)) targetState.todos.seohu = [];
+      if (!Array.isArray(targetState.todos.parents)) targetState.todos.parents = [];
+      if (!Array.isArray(targetState.groceries)) targetState.groceries = [];
+      if (!Array.isArray(targetState.notes)) {
+        targetState.notes = [];
+      } else {
+        targetState.notes.forEach(n => {
+          if (!Array.isArray(n.replies)) n.replies = [];
+        });
+      }
+      if (!Array.isArray(targetState.schedules)) targetState.schedules = [];
+      if (!Array.isArray(targetState.alarms)) targetState.alarms = [];
+      if (!Array.isArray(targetState.photos)) targetState.photos = [];
+      return targetState;
+    }
+
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+        if (!raw) return normalizeStateArrays(JSON.parse(JSON.stringify(DEFAULT_STATE)));
         const parsed = JSON.parse(raw);
-        return {
+        return normalizeStateArrays({
           ...DEFAULT_STATE,
           ...parsed,
-          alarms: parsed.alarms || DEFAULT_STATE.alarms,
+          alarms: Array.isArray(parsed.alarms) ? parsed.alarms : (parsed.alarms === undefined ? DEFAULT_STATE.alarms : []),
           splitRatios: parsed.splitRatios || DEFAULT_STATE.splitRatios,
           quizScoreboard: parsed.quizScoreboard || DEFAULT_STATE.quizScoreboard,
           parentPin: parsed.parentPin || '0531'
-        };
+        });
       } catch (e) {
-        return JSON.parse(JSON.stringify(DEFAULT_STATE));
+        return normalizeStateArrays(JSON.parse(JSON.stringify(DEFAULT_STATE)));
       }
     }
 
@@ -1529,11 +1553,17 @@
         const remoteData = await res.json();
 
         if (remoteData && remoteData.state) {
-          state = {
+          state = normalizeStateArrays({
             ...DEFAULT_STATE,
             ...remoteData.state,
+            todos: remoteData.state.todos || { jihu: [], seohu: [], parents: [] },
+            groceries: remoteData.state.groceries || [],
+            notes: remoteData.state.notes || [],
+            schedules: remoteData.state.schedules || [],
+            alarms: remoteData.state.alarms || [],
+            photos: remoteData.state.photos || [],
             splitRatios: state.splitRatios || DEFAULT_STATE.splitRatios
-          };
+          });
           syncKnownActivityIds();
           lastCloudRevision = remoteData.updatedAt || Date.now();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1620,11 +1650,17 @@
             selectedDate: state.selectedDate,
             splitRatios: state.splitRatios
           };
-          state = {
+          state = normalizeStateArrays({
             ...DEFAULT_STATE,
             ...remoteData.state,
+            todos: remoteData.state.todos || { jihu: [], seohu: [], parents: [] },
+            groceries: remoteData.state.groceries || [],
+            notes: remoteData.state.notes || [],
+            schedules: remoteData.state.schedules || [],
+            alarms: remoteData.state.alarms || [],
+            photos: remoteData.state.photos || [],
             ...keepLocalUi
-          };
+          });
           detectAndNotifyRemoteUpdates();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           renderAll();
@@ -2452,6 +2488,12 @@
       const input = document.getElementById(inputId);
       const text = (input?.value || '').trim();
       if (!text) return;
+      if (!state.todos || typeof state.todos !== 'object') {
+        state.todos = { jihu: [], seohu: [], parents: [] };
+      }
+      if (!Array.isArray(state.todos[groupKey])) {
+        state.todos[groupKey] = [];
+      }
       state.todos[groupKey].push({ id: 'td_' + Date.now(), text, done: false });
       input.value = '';
       saveState();
@@ -2460,7 +2502,7 @@
     }
 
     function toggleTodo(groupKey, idx) {
-      const item = state.todos[groupKey]?.[idx];
+      const item = state.todos?.[groupKey]?.[idx];
       if (!item) return;
       item.done = !item.done;
       saveState();
@@ -2474,6 +2516,7 @@
 
     function deleteTodo(groupKey, idx) {
       if (!requireParentPermission('할 일 삭제')) return;
+      if (!Array.isArray(state.todos?.[groupKey])) return;
       state.todos[groupKey].splice(idx, 1);
       saveState();
       renderTodosAndGroceries();
@@ -2486,6 +2529,7 @@
       const input = document.getElementById('inputGrocery');
       const val = (input?.value || '').trim();
       if (!val) return;
+      if (!Array.isArray(state.groceries)) state.groceries = [];
       state.groceries.push(val);
       input.value = '';
       saveState();
@@ -2495,6 +2539,7 @@
 
     function removeGrocery(idx) {
       if (!requireParentPermission('장보기 품목 삭제')) return;
+      if (!Array.isArray(state.groceries)) return;
       state.groceries.splice(idx, 1);
       saveState();
       renderTodosAndGroceries();
